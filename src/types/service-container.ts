@@ -6,6 +6,7 @@
 import * as vscode from 'vscode';
 import { ILogger } from './logger';
 import { UnifiedSessionDataService, SessionDataServiceOptions } from '../storage/unified-session-data-service';
+import { AnalyticsService } from '../analytics/analytics-service';
 
 export interface ServiceContainerOptions {
 	extensionContext: vscode.ExtensionContext;
@@ -21,6 +22,7 @@ export class ServiceContainer {
 	private static instance: ServiceContainer | null = null;
     
 	private _unifiedSessionDataService?: UnifiedSessionDataService;
+	private _analyticsService?: AnalyticsService;
     
 	private constructor(
 		private readonly extensionContext: vscode.ExtensionContext,
@@ -86,6 +88,17 @@ export class ServiceContainer {
 	}
 
 	/**
+	 * Get the analytics service (creates if not exists)
+	 */
+	getAnalyticsService(): AnalyticsService {
+		if (!this._analyticsService) {
+			this.logger.info('Creating AnalyticsService instance');
+			this._analyticsService = new AnalyticsService(this.logger);
+		}
+		return this._analyticsService;
+	}
+
+	/**
      * Get the extension context
      */
 	getExtensionContext(): vscode.ExtensionContext {
@@ -116,6 +129,7 @@ export class ServiceContainer {
 			this._unifiedSessionDataService.dispose();
 			this._unifiedSessionDataService = undefined;
 		}
+		this._analyticsService = undefined;
         
 		ServiceContainer.instance = null;
 		this.logger.info('Service container disposed');

@@ -8,6 +8,8 @@ export interface CopilotUsageEvent {
 	timestamp: string;             // ISO8601 timestamp
 	type: 'chat' | 'completion' | 'edit' | 'explain';
 	source: 'copilot-chat' | 'copilot-inline' | 'copilot-sidebar';
+	requestId?: string;            // Original request ID within the session (for drill-in)
+	agent?: string;                // Agent identifier (e.g., editsAgent, explainAgent)
     
 	// Session Information (hierarchical)
 	vscodeSessionId: string;       // VS Code process session (20250808T010909)

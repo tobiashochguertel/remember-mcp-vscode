@@ -91,6 +91,18 @@ export class UnifiedSessionDataService {
 			this.logger.debug('Initializing UnifiedSessionDataService...');
             
 			const scanResult = await this.scanAllData();
+
+			// Feed initial events to analytics service if available
+			try {
+				// Lazy import to avoid circular deps
+				const { ServiceContainer } = await import('../types/service-container.js');
+				if (ServiceContainer.isInitialized()) {
+					const analytics = ServiceContainer.getInstance().getAnalyticsService();
+					analytics.ingest(scanResult.sessionEvents, { replace: true });
+				}
+			} catch (e) {
+				this.logger.debug(`Analytics ingestion (init) skipped: ${e}`);
+			}
             
 			if (this.options.enableRealTimeUpdates) {
 				this.startRealTimeUpdates();
@@ -247,6 +259,17 @@ export class UnifiedSessionDataService {
 						this.logger.error(` ${error}`);
 					}
 				});
+
+				// Incremental analytics ingest
+				try {
+					const { ServiceContainer } = await import('../types/service-container.js');
+					if (ServiceContainer.isInitialized()) {
+						const analytics = ServiceContainer.getInstance().getAnalyticsService();
+						analytics.ingest(newEvents, { replace: false });
+					}
+				} catch (e) {
+					this.logger.debug(`Analytics ingestion (update) skipped: ${e}`);
+				}
                 
 				this.logger.info(`REAL-TIME  Session update complete - ${newEvents.length} events from session ${sessionResult.session.sessionId}`);
 			} catch (error) {

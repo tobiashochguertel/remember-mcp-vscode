@@ -100,6 +100,8 @@ export class SessionDataTransformer {
 			timestamp: new Date(request.timestamp).toISOString(), // Convert unix timestamp to ISO string
 			type: eventType,
 			source: 'copilot-chat',
+			requestId: request.requestId,
+			agent: request.agent?.id,
             
 			// Session hierarchy
 			vscodeSessionId: sessionHierarchy.vscodeSessionId,

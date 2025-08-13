@@ -4,7 +4,7 @@
  */
 
 import * as vscode from 'vscode';
-import { EnhancedAnalyticsEngine } from '../../storage/enhanced-analytics-engine';
+import { ServiceContainer } from '../../types/service-container';
 import { ILogger } from '../../types/logger';
 import { CopilotUsageHistoryModel } from './copilot-usage-history-model';
 import { CopilotUsageHistoryView } from './copilot-usage-history-view';
@@ -37,11 +37,13 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 		};
 
 		try {
-			// Initialize enhanced analytics engine
-			const analyticsEngine = new EnhancedAnalyticsEngine(this.context, this.logger);
-			
-			// Initialize model and view immediately (before analytics engine is ready)
-			this._model = new CopilotUsageHistoryModel(analyticsEngine, this.logger);
+			// Resolve shared services from the container
+			const container = ServiceContainer.getInstance();
+			const unifiedData = container.getUnifiedSessionDataService();
+			const analytics = container.getAnalyticsService();
+
+			// Initialize model and view immediately (before data service is fully ready)
+			this._model = new CopilotUsageHistoryModel(this.context, unifiedData, analytics, this.logger);
 			this._view = new CopilotUsageHistoryView(webviewView.webview, this._model, this.extensionUri, this.logger);
 
 			// Handle messages from the webview
@@ -53,8 +55,8 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 			// Render view immediately (will show loading/empty state)
 			await this._view.render();
 
-			// Initialize analytics engine in background (non-blocking)
-			this.initializeAnalyticsAsync(analyticsEngine);
+			// Initialize unified data service in background (non-blocking)
+			this.initializeUnifiedServiceAsync();
 
 		} catch (error) {
 			this.logger.error('Failed to initialize usage history panel:', error);
@@ -65,17 +67,18 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 	/**
 	 * Initialize analytics engine asynchronously in the background
 	 */
-	private initializeAnalyticsAsync(analyticsEngine: EnhancedAnalyticsEngine): void {
-		// Fire and forget - don't await
-		analyticsEngine.initialize().then(() => {
-			this.logger.info('Enhanced analytics engine initialized successfully');
-			// Analytics engine is ready, model will handle data loading
-		}).catch((error: any) => {
-			this.logger.error('Enhanced analytics engine initialization failed:', error);
-			if (this._model) {
-				// Model should handle this error gracefully
-			}
-		});
+	private initializeUnifiedServiceAsync(): void {
+		try {
+			const unified = ServiceContainer.getInstance().getUnifiedSessionDataService();
+			// Fire and forget - don't await
+			unified.initialize().then(() => {
+				this.logger.info('Unified session data service initialized successfully');
+			}).catch((error: any) => {
+				this.logger.error('Unified data service initialization failed:', error);
+			});
+		} catch (error) {
+			this.logger.error('Failed to initialize unified data service:', error);
+		}
 	}
 
 	/**

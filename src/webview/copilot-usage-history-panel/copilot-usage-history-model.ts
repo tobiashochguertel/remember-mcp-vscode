@@ -1,6 +1,7 @@
-import { EnhancedAnalyticsEngine } from '../../storage/enhanced-analytics-engine';
+import * as vscode from 'vscode';
+import { UnifiedSessionDataService } from '../../storage/unified-session-data-service';
+import { AnalyticsService, TimeRange as AnalyticsTimeRange } from '../../analytics/analytics-service';
 import { CopilotUsageEvent, DateRange } from '../../types/usage-events';
-import { AnalyticsQuery } from '../../types/analytics';
 import { ILogger } from '../../types/logger';
 import {
 	SummaryCardsViewModel,
@@ -34,7 +35,9 @@ export class CopilotUsageHistoryModel {
 	public globalState!: GlobalStateViewModel;
 
 	constructor(
-		private readonly analyticsEngine: EnhancedAnalyticsEngine,
+		private readonly extensionContext: vscode.ExtensionContext,
+		private readonly unifiedService: UnifiedSessionDataService,
+		private readonly analyticsService: AnalyticsService,
 		private readonly logger: ILogger
 	) {
 		// Initialize micro-view-models with default states
@@ -196,8 +199,8 @@ export class CopilotUsageHistoryModel {
 		};
 
 		// Register callbacks
-		this.analyticsEngine.onSessionEventsUpdated(this._sessionEventsCallback);
-		this.analyticsEngine.onLogEntriesUpdated(this._logEntriesCallback);
+		this.unifiedService.onSessionEventsUpdated(this._sessionEventsCallback);
+		this.unifiedService.onLogEntriesUpdated(this._logEntriesCallback);
 	}
 
 	/**
@@ -209,7 +212,7 @@ export class CopilotUsageHistoryModel {
 			this.globalState.isScanning = true;
 			this.notifyListeners();
 
-			// Storage manager is already initialized by the panel
+			// Load initial data
 			await this.refreshAllData();
 		} catch (error) {
 			this.logger.error('Failed to initialize history model:', error);
@@ -229,10 +232,14 @@ export class CopilotUsageHistoryModel {
 			this.globalState.isLoading = true;
 
 			// Get current settings and data
-			const settings = await this.analyticsEngine.getSettings();
+			const settings = await this.getSettings();
 			const dateRange = this.getDateRangeForTimespan(settings.defaultTimeRange);
-			const events = await this.analyticsEngine.getEventsForDateRange(dateRange);
-			const storageStats = await this.analyticsEngine.getStorageStats();
+			const allEvents = await this.unifiedService.getSessionEvents();
+			const events = allEvents.filter(e => {
+				const t = new Date(e.timestamp);
+				return t >= dateRange.start && t <= dateRange.end;
+			});
+			const storageStats = await this.computeStorageStats(allEvents);
 
 			// Update filter controls first
 			this.updateFilterControls(settings, dateRange);
@@ -267,12 +274,22 @@ export class CopilotUsageHistoryModel {
 	private async processSessionEvents(events: CopilotUsageEvent[]): Promise<void> {
 		console.log('Model.processSessionEvents: Processing', events.length, 'events');
 		
-		// Calculate analytics
-		const dateRange = this.getDateRangeForTimespan(this.filterControls.timeRange.current);
-		const query: AnalyticsQuery = { dateRange };
-		const analytics = await this.analyticsEngine.calculateAnalytics(events, query);
-		const quickStats = await this.analyticsEngine.calculateQuickStats(events);
+		// Calculate analytics using AnalyticsService
+		const timeRange = this.filterControls.timeRange.current as AnalyticsTimeRange;
+		const filter = { timeRange } as const;
+		const timeSeries = this.analyticsService.getTimeSeries(filter);
+		const languages = this.analyticsService.getLanguages(filter, 50);
+		const models = this.analyticsService.getModels(filter, 50);
+
+		const quickStats = this.calculateQuickStats(events);
 		
+		const analytics = {
+			timeSeriesData: timeSeries.map(p => ({ timestamp: p.t, value: p.total })),
+			eventTypeDistribution: this.calculateEventTypeDistribution(events),
+			languageMetrics: languages.map(l => ({ language: l.id, eventCount: l.count })),
+			modelMetrics: models.map(m => ({ model: m.id, eventCount: m.count }))
+		};
+        
 		console.log('Model.processSessionEvents: Analytics:', analytics);
 		console.log('Model.processSessionEvents: Quick stats:', quickStats);
 
@@ -418,7 +435,7 @@ export class CopilotUsageHistoryModel {
 	/**
 	 * Update filter controls micro-view-model
 	 */
-	private updateFilterControls(settings: any, dateRange: DateRange): void {
+	private updateFilterControls(settings: { defaultTimeRange: '7d' | '30d' | '90d' }, dateRange: DateRange): void {
 		const current = settings.defaultTimeRange;
 
 		this.filterControls = {
@@ -635,7 +652,7 @@ export class CopilotUsageHistoryModel {
 	 * Update time range setting
 	 */
 	public async updateTimeRange(timeRange: '7d' | '30d' | '90d'): Promise<void> {
-		await this.analyticsEngine.updateSettings({ defaultTimeRange: timeRange });
+		await this.updateSettings({ defaultTimeRange: timeRange });
 		await this.refreshAllData();
 	}
 
@@ -643,19 +660,32 @@ export class CopilotUsageHistoryModel {
 	 * Clear all usage data
 	 */
 	public async clearData(): Promise<{ deletedFiles: number; deletedEvents: number }> {
-		const result = await this.analyticsEngine.clearStorage();
+		const all = await this.unifiedService.getSessionEvents();
+		const deletedEvents = all.length;
+		try {
+			// Reset unified cache and clear analytics store
+			await this.unifiedService.resetInitialization();
+			this.analyticsService.ingest([], { replace: true });
+		} catch (e) {
+			this.logger.debug(`clearData side-effects failed: ${e}`);
+		}
 		await this.refreshAllData();
-		return result;
+		return { deletedFiles: 0, deletedEvents };
 	}
 
 	/**
 	 * Export usage data
 	 */
 	public async getExportData(): Promise<any> {
-		const settings = await this.analyticsEngine.getSettings();
+		const settings = await this.getSettings();
 		const dateRange = this.getDateRangeForTimespan(settings.defaultTimeRange);
-		const events = await this.analyticsEngine.getEventsForDateRange(dateRange);
-
+		const allEvents = await this.unifiedService.getSessionEvents();
+		const events = allEvents.filter(e => {
+			const t = new Date(e.timestamp);
+			return t >= dateRange.start && t <= dateRange.end;
+		});
+		const timeRange = settings.defaultTimeRange as AnalyticsTimeRange;
+		const filter = { timeRange } as const;
 		return {
 			metadata: {
 				exportedAt: new Date().toISOString(),
@@ -666,7 +696,13 @@ export class CopilotUsageHistoryModel {
 				}
 			},
 			events,
-			analytics: await this.analyticsEngine.calculateAnalytics(events, { dateRange })
+			analytics: {
+				kpis: this.analyticsService.getKpis(filter),
+				agents: this.analyticsService.getAgents(filter, 100),
+				models: this.analyticsService.getModels(filter, 100),
+				languages: this.analyticsService.getLanguages(filter, 100),
+				timeSeries: this.analyticsService.getTimeSeries(filter)
+			}
 		};
 	}
 
@@ -689,12 +725,14 @@ export class CopilotUsageHistoryModel {
 		this.notifyListeners();
 
 		try {
-			const result = await this.analyticsEngine.scanChatSessions();
+			const result = await this.unifiedService.scanAllData();
+			// Replace analytics events store with latest
+			this.analyticsService.ingest(result.sessionEvents, { replace: true });
 
 			this.filterControls.scanProgress = {
 				isScanning: false,
 				status: 'complete',
-				message: `Complete: ${result.events.length} events found`
+				message: `Complete: ${result.sessionEvents.length} events found`
 			};
 
 			// Reset scanning state and refresh all data
@@ -703,7 +741,7 @@ export class CopilotUsageHistoryModel {
 				isScanning: false
 			};
 			await this.refreshAllData();
-			return result;
+			return { events: result.sessionEvents, stats: result.stats };
 
 		} catch (error) {
 			this.filterControls.scanProgress = {
@@ -783,13 +821,117 @@ export class CopilotUsageHistoryModel {
 	public dispose(): void {
 		// Remove callbacks
 		if (this._sessionEventsCallback) {
-			this.analyticsEngine.removeSessionEventCallback(this._sessionEventsCallback);
+			this.unifiedService.removeSessionEventCallback(this._sessionEventsCallback);
 		}
 		if (this._logEntriesCallback) {
-			this.analyticsEngine.removeLogEventCallback(this._logEntriesCallback);
+			this.unifiedService.removeLogEventCallback(this._logEntriesCallback);
 		}
 
 		// Clear listeners
 		this._listeners = [];
+	}
+
+	// ---------- New helpers using AnalyticsService / Unified data ----------
+	private async getSettings(): Promise<{ defaultTimeRange: '7d' | '30d' | '90d' }> {
+		const key = 'copilot-usage-history-settings';
+		const stored = this.extensionContext.globalState.get<{ defaultTimeRange: '7d' | '30d' | '90d' }>(key);
+		return stored || { defaultTimeRange: '30d' };
+	}
+
+	private async updateSettings(update: Partial<{ defaultTimeRange: '7d' | '30d' | '90d' }>): Promise<void> {
+		const key = 'copilot-usage-history-settings';
+		const current = await this.getSettings();
+		await this.extensionContext.globalState.update(key, { ...current, ...update });
+	}
+
+	private async computeStorageStats(allEvents: CopilotUsageEvent[]): Promise<{ totalFiles: number; totalSizeBytes: number; oldestEvent?: string; newestEvent?: string }> {
+		let oldestEvent: string | undefined;
+		let newestEvent: string | undefined;
+		if (allEvents.length > 0) {
+			oldestEvent = allEvents[0].timestamp;
+			newestEvent = allEvents[allEvents.length - 1].timestamp;
+		}
+		const totalSizeBytes = JSON.stringify(allEvents).length;
+		return { totalFiles: 0, totalSizeBytes, oldestEvent, newestEvent };
+	}
+
+	private calculateQuickStats(events: CopilotUsageEvent[]): {
+		totalEvents: number;
+		eventsToday: number;
+		eventsThisWeek: number;
+		eventsThisMonth: number;
+		averageSessionDuration: string;
+		topLanguage: string;
+		topModel: string;
+		lastEventTime?: string;
+	} {
+		const now = new Date();
+		const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+		const weekStart = new Date(now.getTime() - now.getDay() * 24 * 60 * 60 * 1000);
+		const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+		const eventsToday = events.filter(e => new Date(e.timestamp) >= today).length;
+		const eventsThisWeek = events.filter(e => new Date(e.timestamp) >= weekStart).length;
+		const eventsThisMonth = events.filter(e => new Date(e.timestamp) >= monthStart).length;
+
+		// Average session duration (approx based on events per session)
+		const sessions = new Map<string, CopilotUsageEvent[]>();
+		for (const e of events) {
+			const arr = sessions.get(e.sessionId) || [];
+			arr.push(e);
+			sessions.set(e.sessionId, arr);
+		}
+		let avgDuration = 0;
+		if (sessions.size > 0) {
+			let sum = 0;
+			for (const arr of sessions.values()) {
+				const sorted = arr.slice().sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+				const d = new Date(sorted[sorted.length - 1].timestamp).getTime() - new Date(sorted[0].timestamp).getTime();
+				sum += d;
+			}
+			avgDuration = sum / sessions.size;
+		}
+
+		// Top model
+		const modelCounts = new Map<string, number>();
+		for (const e of events) {
+			const k = e.model || 'Unknown';
+			modelCounts.set(k, (modelCounts.get(k) || 0) + 1);
+		}
+		const topModel = Array.from(modelCounts.entries()).sort((a,b) => b[1]-a[1])[0]?.[0] || 'None';
+
+		const lastEvent = events[events.length - 1];
+		const lastEventTime = lastEvent ? lastEvent.timestamp : undefined;
+
+		return {
+			totalEvents: events.length,
+			eventsToday,
+			eventsThisWeek,
+			eventsThisMonth,
+			averageSessionDuration: this.formatDuration(avgDuration),
+			topLanguage: 'None',
+			topModel,
+			lastEventTime
+		};
+	}
+
+	private calculateEventTypeDistribution(events: CopilotUsageEvent[]): Array<{ type: string; count: number }> {
+		const map = new Map<string, number>();
+		for (const e of events) {
+			map.set(e.type, (map.get(e.type) || 0) + 1);
+		}
+		return Array.from(map.entries()).map(([type, count]) => ({ type, count })).sort((a,b) => b.count - a.count);
+	}
+
+	private formatDuration(durationMs: number): string {
+		if (durationMs < 1000) {
+			return `${Math.round(durationMs)}ms`;
+		} else if (durationMs < 60000) {
+			return `${Math.round(durationMs / 1000)}s`;
+		} else if (durationMs < 3600000) {
+			return `${Math.round(durationMs / 60000)}m`;
+		} else {
+			return `${Math.round(durationMs / 3600000)}h`;
+		}
 	}
 }
