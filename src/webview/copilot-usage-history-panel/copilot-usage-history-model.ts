@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
-import { UnifiedSessionDataService } from '../../storage/unified-session-data-service';
-import { AnalyticsService, TimeRange as AnalyticsTimeRange } from '../../analytics/analytics-service';
+import { UnifiedSessionDataService } from '../../services/unified-session-data-service';
+import { AnalyticsService, TimeRange as AnalyticsTimeRange } from '../../services/analytics-service';
 import { CopilotUsageEvent, DateRange } from '../../types/usage-events';
+
 import { ILogger } from '../../types/logger';
 import {
 	SummaryCardsViewModel,

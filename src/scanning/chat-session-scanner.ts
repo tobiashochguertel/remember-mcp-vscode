@@ -21,25 +21,29 @@ export class ChatSessionScanner {
 	private fileWatcher?: ForceFileWatcher;
 	private watcherCallbacks: Array<(result: SessionScanResult) => void> = [];
 	private isWatching = false;
+	private lastUsedStoragePaths: string[] = [];
     
 	constructor(
+		private readonly storagePaths: string[],
 		private readonly logger: ILogger,
 		private readonly watcherOptions: SessionWatcherOptions = {
 			enableWatching: true,
 			debounceMs: SESSION_SCAN_CONSTANTS.DEFAULT_DEBOUNCE_MS,
 			maxRetries: SESSION_SCAN_CONSTANTS.DEFAULT_MAX_RETRIES
 		}
-	) {}
+	) {
+		this.lastUsedStoragePaths = [...storagePaths];
+	}
 
 	/**
      * Find all chat session files across VS Code storage locations
      */
-	async findAllChatSessionFiles(storagePaths: string[]): Promise<string[]> {
+	async findAllChatSessionFiles(): Promise<string[]> {
 		this.logger.info('Starting comprehensive session file scan...');
         
 		const allFiles: string[] = [];
         
-		for (const basePath of storagePaths) {
+		for (const basePath of this.storagePaths) {
 			try {
 				const files = await this.scanStorageLocation(basePath);
 				allFiles.push(...files);
@@ -165,12 +169,12 @@ export class ChatSessionScanner {
 	/**
      * Scan all session files and return parsed results
      */
-	async scanAllSessions(storagePaths: string[]): Promise<{ results: SessionScanResult[]; stats: SessionScanStats }> {
+	async scanAllSessions(): Promise<{ results: SessionScanResult[]; stats: SessionScanStats }> {
 		const startTime = Date.now();
         
 		this.logger.info('Starting full session scan...');
         
-		const allFiles = await this.findAllChatSessionFiles(storagePaths);
+		const allFiles = await this.findAllChatSessionFiles();
 		const results: SessionScanResult[] = [];
 		let errorFiles = 0;
 		let totalRequests = 0;
@@ -310,11 +314,10 @@ export class ChatSessionScanner {
 	}
 
 	/**
-     * Get VS Code storage paths - requires storage paths to be provided by caller
-     * This scanner should not determine paths itself - that's the caller's responsibility
+     * Get VS Code storage paths - now returns the injected storage paths
      */
 	private getVSCodeStoragePaths(): string[] {
-		throw new Error('Storage paths must be provided by caller. Use findAllChatSessionFiles(storagePaths) or scanAllSessions(storagePaths).');
+		return this.storagePaths;
 	}
 
 	/**
@@ -396,6 +399,60 @@ export class ChatSessionScanner {
 			isWatching: this.isWatching,
 			callbackCount: this.watcherCallbacks.length
 		};
+	}
+
+	/**
+     * Get the storage paths that were last used for scanning
+     */
+	getLastUsedStoragePaths(): string[] {
+		return [...this.lastUsedStoragePaths];
+	}
+
+	/**
+     * Get detailed information about discovered workspaces and session counts
+     */
+	async getWorkspaceInfo(storagePaths?: string[]): Promise<{ workspaces: any[]; totalSessions: number }> {
+		const pathsToUse = storagePaths || this.lastUsedStoragePaths;
+		const workspaces: any[] = [];
+		let totalSessions = 0;
+
+		for (const storagePath of pathsToUse) {
+			try {
+				await fs.access(storagePath);
+				const workspaceDirs = await fs.readdir(storagePath, { withFileTypes: true });
+				
+				for (const workspaceDir of workspaceDirs) {
+					if (!workspaceDir.isDirectory()) {
+						continue;
+					}
+					
+					const chatSessionsPath = path.join(storagePath, workspaceDir.name, SESSION_SCAN_CONSTANTS.CHAT_SESSIONS_DIR);
+					
+					try {
+						await fs.access(chatSessionsPath);
+						const sessionFiles = await fs.readdir(chatSessionsPath);
+						const jsonFiles = sessionFiles.filter(f => SESSION_SCAN_CONSTANTS.SESSION_FILE_PATTERN.test(f));
+						
+						workspaces.push({
+							hash: workspaceDir.name,
+							storagePath: storagePath,
+							chatSessionsPath: chatSessionsPath,
+							sessionCount: jsonFiles.length,
+							edition: storagePath.includes('Insiders') ? 'VS Code Insiders' : 'VS Code Stable'
+						});
+						
+						totalSessions += jsonFiles.length;
+					} catch {
+						// No chatSessions directory
+						continue;
+					}
+				}
+			} catch (error) {
+				this.logger.error(`Error scanning workspace info for ${storagePath}: ${error}`);
+			}
+		}
+
+		return { workspaces, totalSessions };
 	}
 
 	/**

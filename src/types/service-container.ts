@@ -4,9 +4,16 @@
  */
 
 import * as vscode from 'vscode';
+import * as os from 'os';
+import * as path from 'path';
 import { ILogger } from './logger';
-import { UnifiedSessionDataService, SessionDataServiceOptions } from '../storage/unified-session-data-service';
-import { AnalyticsService } from '../analytics/analytics-service';
+import { AggregatedSessionData, DailyAggregatedData } from './aggregated-session-data';
+import { UnifiedSessionDataService, SessionDataServiceOptions } from '../services/unified-session-data-service';
+import { AnalyticsService } from '../services/analytics-service';
+import { ChatSessionScanner } from '../scanning/chat-session-scanner';
+import { CopilotLogScanner } from '../scanning/copilot-log-scanner';
+import { SessionDataTransformer } from '../scanning/session-data-transformer';
+import { SESSION_SCAN_CONSTANTS } from './chat-session';
 
 export interface ServiceContainerOptions {
 	extensionContext: vscode.ExtensionContext;
@@ -45,9 +52,7 @@ export class ServiceContainer {
 			options.extensionVersion,
 			{
 				enableRealTimeUpdates: true,
-				enableLogScanning: true,
 				debounceMs: 500,
-				extensionContext: options.extensionContext,
 				...options.sessionDataServiceOptions
 			}
 		);
@@ -78,13 +83,51 @@ export class ServiceContainer {
 	getUnifiedSessionDataService(): UnifiedSessionDataService {
 		if (!this._unifiedSessionDataService) {
 			this.logger.info('Creating UnifiedSessionDataService instance');
+			
+			// Create storage paths
+			const storagePaths = this.getVSCodeStoragePaths();
+			
+			// Create session scanner
+			const sessionScanner = new ChatSessionScanner(
+				storagePaths,
+				this.logger,
+				{
+					enableWatching: this.sessionDataServiceOptions.enableRealTimeUpdates ?? true,
+					debounceMs: this.sessionDataServiceOptions.debounceMs ?? 500,
+					maxRetries: 3
+				}
+			);
+			
+			// Create log scanner (optional)
+			const logScanner = new CopilotLogScanner(this.logger, this.extensionContext);
+			
+			// Create session data transformer
+			const sessionTransformer = new SessionDataTransformer(
+				this.logger,
+				this.extensionVersion
+			);
+			
+			// Create unified service with injected dependencies
 			this._unifiedSessionDataService = new UnifiedSessionDataService(
+				sessionScanner,
+				logScanner,
+				sessionTransformer,
 				this.logger,
 				this.extensionVersion,
 				this.sessionDataServiceOptions
 			);
 		}
 		return this._unifiedSessionDataService;
+	}
+
+	/**
+	 * Get VS Code storage paths for session scanning
+	 */
+	private getVSCodeStoragePaths(): string[] {
+		const homedir = os.homedir();
+		return SESSION_SCAN_CONSTANTS.VSCODE_STORAGE_PATHS.map(relativePath => 
+			path.join(homedir, relativePath)
+		);
 	}
 
 	/**

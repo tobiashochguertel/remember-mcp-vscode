@@ -5,7 +5,7 @@ import { promisify } from 'util';
 import { CopilotUsageHistoryPanel } from './webview/copilot-usage-history-panel/index';
 import { ServerControlPanel } from './webview/server-control-panel/index';
 import { CopilotUsagePanel } from './webview/copilot-usage-panel';
-import { UnifiedSessionDataService } from './storage/unified-session-data-service';
+import { UnifiedSessionDataService } from './services/unified-session-data-service';
 import { VSCodeLogger, ILogger } from './types/logger';
 import { ServiceContainer } from './types/service-container';
 

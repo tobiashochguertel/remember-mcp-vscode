@@ -5,7 +5,6 @@
  * 2. Log Events: Real-time request-level data from log files
  */
 
-import * as vscode from 'vscode';
 import { Mutex } from 'async-mutex';
 import { CopilotUsageEvent } from '../types/usage-events';
 import { ChatSessionScanner } from '../scanning/chat-session-scanner';
@@ -16,17 +15,16 @@ import { ILogger } from '../types/logger';
 
 export interface SessionDataServiceOptions {
 	enableRealTimeUpdates?: boolean;
-	enableLogScanning?: boolean;
 	debounceMs?: number;
-	extensionContext?: vscode.ExtensionContext;
 }
 
 export class UnifiedSessionDataService {
-	private sessionScanner: ChatSessionScanner;
-	private sessionTransformer: SessionDataTransformer;
-	private logScanner?: CopilotLogScanner;
 	private isWatchingEnabled = false;
 	private isInitialized = false;
+
+	// Public access to scanners (injected dependencies)
+	public get chatSessionScanner(): ChatSessionScanner { return this.sessionScanner; }
+	public get copilotLogScanner(): CopilotLogScanner | undefined { return this.logScanner; }
     
 	// Mutexes to prevent race conditions
 	private initializationMutex = new Mutex();
@@ -43,28 +41,14 @@ export class UnifiedSessionDataService {
 	private lastScanStats?: SessionScanStats;
 
 	constructor(
+		private readonly sessionScanner: ChatSessionScanner,
+		private readonly logScanner: CopilotLogScanner | undefined,
+		private readonly sessionTransformer: SessionDataTransformer,
 		private readonly logger: ILogger,
 		private readonly extensionVersion: string,
 		private readonly options: SessionDataServiceOptions = {}
 	) {
-		this.sessionScanner = new ChatSessionScanner(logger, {
-			enableWatching: options.enableRealTimeUpdates ?? true,
-			debounceMs: options.debounceMs ?? 500,
-			maxRetries: 3
-		});
-        
-		this.sessionTransformer = new SessionDataTransformer(
-			logger,
-			extensionVersion
-		);
-
-		// Initialize log scanning if enabled and extension context provided
-		if (options.enableLogScanning && options.extensionContext) {
-			this.logScanner = new CopilotLogScanner(
-				logger,
-				options.extensionContext
-			);
-		}
+		// All dependencies are now injected - no construction here
 	}
 
 	/**

@@ -178,6 +178,8 @@
   "scripts": {
     "vscode:prepublish": "npm run generate-marketplace-readme && npm run package",
     "generate-marketplace-readme": "node scripts/generate-marketplace-readme.js",
+    "monitor": "node scripts/monitor-copilot-sessions.js",
+    "monitor:help": "node scripts/monitor-copilot-sessions.js --help",
     "clean": "rimraf out dist node_modules/.cache",
     "build": "tsx .esbuild.ts",
     "compile": "tsx .esbuild.ts --dev",
