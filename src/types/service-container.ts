@@ -7,7 +7,6 @@ import * as vscode from 'vscode';
 import * as os from 'os';
 import * as path from 'path';
 import { ILogger } from './logger';
-import { AggregatedSessionData, DailyAggregatedData } from './aggregated-session-data';
 import { UnifiedSessionDataService, SessionDataServiceOptions } from '../services/unified-session-data-service';
 import { AnalyticsService } from '../services/analytics-service';
 import { ChatSessionScanner } from '../scanning/chat-session-scanner';
