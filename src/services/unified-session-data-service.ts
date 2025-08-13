@@ -8,7 +8,7 @@
 import { Mutex } from 'async-mutex';
 import { CopilotUsageEvent } from '../types/usage-events';
 import { ChatSessionScanner } from '../scanning/chat-session-scanner';
-import { SessionDataTransformer } from '../scanning/session-data-transformer';
+import { SessionDataTransformer } from './session-data-transformer';
 import { CopilotLogScanner, LogScanResult, LogEntry } from '../scanning/copilot-log-scanner';
 import { SessionScanResult, SessionScanStats } from '../types/chat-session';
 import { ILogger } from '../types/logger';

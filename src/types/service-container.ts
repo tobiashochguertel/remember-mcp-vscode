@@ -11,7 +11,7 @@ import { UnifiedSessionDataService, SessionDataServiceOptions } from '../service
 import { AnalyticsService } from '../services/analytics-service';
 import { ChatSessionScanner } from '../scanning/chat-session-scanner';
 import { CopilotLogScanner } from '../scanning/copilot-log-scanner';
-import { SessionDataTransformer } from '../scanning/session-data-transformer';
+import { SessionDataTransformer } from '../services/session-data-transformer';
 import { SESSION_SCAN_CONSTANTS } from './chat-session';
 
 export interface ServiceContainerOptions {
