@@ -393,7 +393,8 @@ export function activate(context: vscode.ExtensionContext) {
 		extensionVersion: context.extension.packageJSON.version,
 		sessionDataServiceOptions: {
 			enableRealTimeUpdates: true,
-			enableLogScanning: true,
+			enableWindowLogScanning: true,
+			extensionContext: context,
 			debounceMs: 500
 		}
 	});

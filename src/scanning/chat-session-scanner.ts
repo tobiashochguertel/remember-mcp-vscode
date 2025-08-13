@@ -34,13 +34,12 @@ export class ChatSessionScanner {
 	/**
      * Find all chat session files across VS Code storage locations
      */
-	async findAllChatSessionFiles(): Promise<string[]> {
+	async findAllChatSessionFiles(storagePaths: string[]): Promise<string[]> {
 		this.logger.info('Starting comprehensive session file scan...');
         
 		const allFiles: string[] = [];
-		const basePaths = this.getVSCodeStoragePaths();
         
-		for (const basePath of basePaths) {
+		for (const basePath of storagePaths) {
 			try {
 				const files = await this.scanStorageLocation(basePath);
 				allFiles.push(...files);
@@ -166,12 +165,12 @@ export class ChatSessionScanner {
 	/**
      * Scan all session files and return parsed results
      */
-	async scanAllSessions(): Promise<{ results: SessionScanResult[]; stats: SessionScanStats }> {
+	async scanAllSessions(storagePaths: string[]): Promise<{ results: SessionScanResult[]; stats: SessionScanStats }> {
 		const startTime = Date.now();
         
 		this.logger.info('Starting full session scan...');
         
-		const allFiles = await this.findAllChatSessionFiles();
+		const allFiles = await this.findAllChatSessionFiles(storagePaths);
 		const results: SessionScanResult[] = [];
 		let errorFiles = 0;
 		let totalRequests = 0;
@@ -311,32 +310,11 @@ export class ChatSessionScanner {
 	}
 
 	/**
-     * Get VS Code storage paths for current OS
+     * Get VS Code storage paths - requires storage paths to be provided by caller
+     * This scanner should not determine paths itself - that's the caller's responsibility
      */
 	private getVSCodeStoragePaths(): string[] {
-		const homeDir = os.homedir();
-		const paths: string[] = [];
-        
-		if (process.platform === 'win32') {
-			// Windows paths
-			for (const relativePath of SESSION_SCAN_CONSTANTS.VSCODE_STORAGE_PATHS) {
-				paths.push(path.join(homeDir, relativePath));
-			}
-		} else if (process.platform === 'darwin') {
-			// macOS paths
-			paths.push(
-				path.join(homeDir, 'Library/Application Support/Code/User/workspaceStorage'),
-				path.join(homeDir, 'Library/Application Support/Code - Insiders/User/workspaceStorage')
-			);
-		} else {
-			// Linux paths
-			paths.push(
-				path.join(homeDir, '.config/Code/User/workspaceStorage'),
-				path.join(homeDir, '.config/Code - Insiders/User/workspaceStorage')
-			);
-		}
-        
-		return paths;
+		throw new Error('Storage paths must be provided by caller. Use findAllChatSessionFiles(storagePaths) or scanAllSessions(storagePaths).');
 	}
 
 	/**

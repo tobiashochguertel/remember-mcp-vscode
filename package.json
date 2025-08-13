@@ -128,7 +128,7 @@
         {
           "type": "webview",
           "id": "copilot-usage-history-panel",
-          "name": "Usage History",
+          "name": "Copilot Usage History",
           "icon": "media/remember-new-logo-letter-black.svg"
         },
         {
