@@ -9,7 +9,9 @@ import { Mutex } from 'async-mutex';
 import { CopilotUsageEvent } from '../types/usage-events';
 import { ChatSessionScanner } from '../scanning/chat-session-scanner';
 import { SessionDataTransformer } from './session-data-transformer';
-import { CopilotLogScanner, LogScanResult, LogEntry } from '../scanning/copilot-log-scanner';
+// Switched from CopilotLogScanner to GlobalLogScanner for unified log monitoring
+import { GlobalLogScanner } from '../scanning/global-log-scanner';
+import { LogEntry } from '../scanning/log-types';
 import { SessionScanResult, SessionScanStats } from '../types/chat-session';
 import { ILogger } from '../types/logger';
 
@@ -24,7 +26,8 @@ export class UnifiedSessionDataService {
 
 	// Public access to scanners (injected dependencies)
 	public get chatSessionScanner(): ChatSessionScanner { return this.sessionScanner; }
-	public get copilotLogScanner(): CopilotLogScanner | undefined { return this.logScanner; }
+	// Access to global log scanner (replaces former copilotLogScanner)
+	public get globalLogScanner(): GlobalLogScanner | undefined { return this.logScanner; }
     
 	// Mutexes to prevent race conditions
 	private initializationMutex = new Mutex();
@@ -42,7 +45,7 @@ export class UnifiedSessionDataService {
 
 	constructor(
 		private readonly sessionScanner: ChatSessionScanner,
-		private readonly logScanner: CopilotLogScanner | undefined,
+		private readonly logScanner: GlobalLogScanner | undefined,
 		private readonly sessionTransformer: SessionDataTransformer,
 		private readonly logger: ILogger,
 		private readonly extensionVersion: string,
@@ -261,56 +264,41 @@ export class UnifiedSessionDataService {
 			}
 		});
 
-		// Start watching log files if enabled
+		// Start watching global log files if enabled
 		if (this.logScanner) {
-			this.logger.info(`Starting log file watching with ${this.logEventCallbacks.length} callbacks`);
-            
-			// Register callback for log updates
-			this.logScanner.onLogUpdated(async (logResult: LogScanResult) => {
+			this.logger.info(`Starting GLOBAL log watching with ${this.logEventCallbacks.length} callbacks`);
+			this.logScanner.onGlobalLogActivity(async (globalResult) => {
 				try {
-					this.logger.warn(`UNIFIED REAL-TIME  Received ${logResult.logEntries.length} log entries`);
-                    
-					if (logResult.logEntries.length > 0) {
-						// Update cached log entries 
+					this.logger.warn(`UNIFIED REAL-TIME GLOBAL  Received ${globalResult.logEntries.length} log entries`);
+					if (globalResult.logEntries.length > 0) {
 						const beforeCount = this.cachedLogEntries.length;
-                        
-						// Add only new entries (avoid duplicates by checking timestamp and requestId)
-						const newEntries = logResult.logEntries.filter(newEntry => 
-							!this.cachedLogEntries.some(existingEntry => 
-								existingEntry.requestId === newEntry.requestId && 
-                                existingEntry.timestamp.getTime() === newEntry.timestamp.getTime()
+						// Deduplicate
+						const newEntries = globalResult.logEntries.filter(newEntry =>
+							!this.cachedLogEntries.some(existingEntry =>
+								existingEntry.requestId === newEntry.requestId && existingEntry.timestamp.getTime() === newEntry.timestamp.getTime()
 							)
 						);
-                        
 						if (newEntries.length > 0) {
 							this.cachedLogEntries.push(...newEntries);
-                            
-							// Sort by timestamp
 							this.cachedLogEntries.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-                            
-							this.logger.trace(`REAL-TIME  Cache updated from ${beforeCount} to ${this.cachedLogEntries.length} entries (${newEntries.length} new)`);
-                            
-							// Notify log event callbacks with new entries
-							this.logger.trace(`REAL-TIME  Notifying ${this.logEventCallbacks.length} callbacks`);
+							this.logger.trace(`REAL-TIME GLOBAL  Cache updated from ${beforeCount} to ${this.cachedLogEntries.length} entries (${newEntries.length} new)`);
+							this.logger.trace(`REAL-TIME GLOBAL  Notifying ${this.logEventCallbacks.length} callbacks`);
 							this.logEventCallbacks.forEach((callback, index) => {
 								try {
-									this.logger.trace(`REAL-TIME  Calling log callback ${index + 1}/${this.logEventCallbacks.length}`);
-									callback(newEntries); // Pass only new entries, not all cached entries
+									this.logger.trace(`REAL-TIME GLOBAL  Calling log callback ${index + 1}/${this.logEventCallbacks.length}`);
+									callback(newEntries);
 								} catch (error) {
 									this.logger.error(` ${error}`);
 								}
 							});
 						}
 					}
-                    
-					this.logger.info(`REAL-TIME  Log update complete - ${logResult.logEntries.length} entries processed`);
+					this.logger.info(`REAL-TIME GLOBAL  Log update complete - ${globalResult.logEntries.length} entries processed`);
 				} catch (error) {
-					this.logger.error(`Error processing log update: ${error}`);
+					this.logger.error(`Error processing global log update: ${error}`);
 				}
 			});
-            
-			// Start the log scanner watcher
-			this.logScanner.startWatching();
+			this.logScanner.startGlobalWatching();
 		}
 
 		this.isWatchingEnabled = true;
@@ -327,7 +315,7 @@ export class UnifiedSessionDataService {
 
 		this.sessionScanner.stopWatching();
 		if (this.logScanner) {
-			this.logScanner.stopWatching();
+			this.logScanner.stopGlobalWatching();
 		}
 		this.isWatchingEnabled = false;
 		this.logger.info('Real-time updates disabled');

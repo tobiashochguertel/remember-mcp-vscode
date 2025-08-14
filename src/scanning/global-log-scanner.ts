@@ -13,6 +13,7 @@
 import * as vscode from 'vscode';
 import { ForceFileWatcher } from '../util/force-file-watcher';
 import * as path from 'path';
+import * as fs from 'fs/promises';
 import { ILogger } from '../types/logger';
 import { LogParsingUtils } from './log-parsing-utils';
 import { LogPathDiscovery } from './log-path-discovery';
@@ -22,6 +23,9 @@ export class GlobalLogScanner {
 	private globalWatchers: ForceFileWatcher[] = [];
 	private globalEventCallbacks: Array<(result: GlobalLogScanResult) => void> = [];
 	private isWatchingGlobally = false;
+	// Track per-file incremental read positions
+	private fileStates: Map<string, { lastPosition: number }> = new Map();
+	private processingFiles: Set<string> = new Set();
 
 	constructor(
 		private readonly logger: ILogger
@@ -124,6 +128,9 @@ export class GlobalLogScanner {
 				watcher.onDidCreate(async (uri) => {
 					const createdFile = uri.fsPath;
 					this.logger.info(`GLOBAL: New log file created in ${versionName} - ${createdFile}`);
+					// Initialize from start (not tail) so we capture initial existing contents
+					await this.initializeFileState(createdFile, false /* from-start: capture initial file contents */);
+					// Process immediately to emit any existing entries present at creation time
 					await this.handleGlobalLogChange(createdFile, versionName);
 				});
 
@@ -136,6 +143,8 @@ export class GlobalLogScanner {
 				watcher.onDidDelete((uri) => {
 					const deletedFile = uri.fsPath;
 					this.logger.info(`GLOBAL: Log file deleted in ${versionName} - ${deletedFile}`);
+					this.fileStates.delete(deletedFile);
+					this.processingFiles.delete(deletedFile);
 				});
 
 				watcher.start();
@@ -153,43 +162,113 @@ export class GlobalLogScanner {
 	 * Handle changes in any log file across all VS Code instances
 	 */
 	private async handleGlobalLogChange(logPath: string, versionName: string): Promise<void> {
-		try {
-			// Extract session info from path
-			const pathParts = logPath.split(path.sep);
-			const sessionIndex = pathParts.findIndex(part => part.match(/^\d{8}T\d{6}$/));
-			const sessionId = sessionIndex >= 0 ? pathParts[sessionIndex] : 'unknown';
-			const windowIndex = pathParts.findIndex(part => part.startsWith('window'));
-			const windowId = windowIndex >= 0 ? pathParts[windowIndex] : 'unknown';
-
-			// Read new content from this specific log file
-			const content = await LogParsingUtils.readFileContent(logPath);
-			const entries = LogParsingUtils.parseMultiLineRequests(content);
-
-			if (entries.length > 0) {
-				// Add source metadata to entries
-				entries.forEach(entry => {
-					entry.rawLine = `[${versionName}][${sessionId}][${windowId}] ${entry.rawLine}`;
-				});
-
-				const result: GlobalLogScanResult = {
-					logEntries: entries,
-					scope: 'global',
-					metadata: {
-						vscodeVersion: versionName,
-						sessionId,
-						windowId,
-						totalInstancesScanned: 1, // This is a single instance change
-						scanStartTime: new Date().toISOString(),
-						scanEndTime: new Date().toISOString()
-					}
-				};
-
-				this.logger.info(`GLOBAL: Processing ${entries.length} entries from ${versionName} ${sessionId}/${windowId}`);
-				this.notifyGlobalCallbacks(result);
-			}
-		} catch (error) {
-			this.logger.error(`GLOBAL: Error handling log change ${logPath}: ${error}`);
+		if (this.processingFiles.has(logPath)) {
+			// Prevent overlapping reads; queue a follow-up lightweight pass
+			setTimeout(() => this.handleGlobalLogChange(logPath, versionName).catch(() => {}), 200);
+			return;
 		}
+
+		this.processingFiles.add(logPath);
+		try {
+			await this.ensureFileState(logPath);
+			const newContent = await this.readNewContent(logPath);
+			if (!newContent.trim()) {
+				this.logger.trace(`GLOBAL: No new content for ${logPath}`);
+				return;
+			}
+
+			// Extract session/window info from path
+			const { sessionId, windowId } = this.extractPathMetadata(logPath);
+
+			const entries = LogParsingUtils.parseMultiLineRequests(newContent);
+			if (entries.length === 0) {
+				this.logger.trace(`GLOBAL: Parsed 0 entries from incremental chunk (${newContent.length} bytes)`);
+				return;
+			}
+
+			entries.forEach(entry => {
+				entry.rawLine = `[${versionName}][${sessionId}][${windowId}] ${entry.rawLine}`;
+			});
+
+			const nowIso = new Date().toISOString();
+			const result: GlobalLogScanResult = {
+				logEntries: entries,
+				scope: 'global',
+				metadata: {
+					vscodeVersion: versionName,
+					sessionId,
+					windowId,
+					totalInstancesScanned: 1,
+					scanStartTime: nowIso,
+					scanEndTime: nowIso
+				}
+			};
+
+			this.logger.info(`GLOBAL: Processing ${entries.length} incremental entries from ${versionName} ${sessionId}/${windowId}`);
+			this.notifyGlobalCallbacks(result);
+		} catch (error) {
+			this.logger.error(`GLOBAL: Error handling incremental log change ${logPath}: ${error}`);
+		} finally {
+			this.processingFiles.delete(logPath);
+		}
+	}
+
+	/** Ensure file state exists (tail mode by default) */
+	private async ensureFileState(logPath: string): Promise<void> {
+		if (!this.fileStates.has(logPath)) {
+			await this.initializeFileState(logPath, true);
+		}
+	}
+
+	/** Initialize per-file state. tailMode=true means start at EOF (skip historical). */
+	private async initializeFileState(logPath: string, tailMode: boolean): Promise<void> {
+		try {
+			const stats = await fs.stat(logPath);
+			const lastPosition = tailMode ? stats.size : 0;
+			this.fileStates.set(logPath, { lastPosition });
+			this.logger.trace(`GLOBAL: Initialized file state (${tailMode ? 'tail' : 'from-start'}) for ${logPath} at position ${lastPosition}`);
+		} catch (error) {
+			this.logger.error(`GLOBAL: Failed to initialize file state for ${logPath}: ${error}`);
+		}
+	}
+
+	/** Incremental read of new content */
+	private async readNewContent(logPath: string): Promise<string> {
+		const state = this.fileStates.get(logPath);
+		if (!state) {
+			return '';
+		}
+		try {
+			const stats = await fs.stat(logPath);
+			if (stats.size < state.lastPosition) {
+				this.logger.trace(`GLOBAL: Detected truncation/rotation for ${logPath} (size ${stats.size} < ${state.lastPosition}), resetting`);
+				state.lastPosition = 0;
+			}
+			if (stats.size === state.lastPosition) {
+				return '';
+			}
+			const newSize = stats.size - state.lastPosition;
+			const fd = await fs.open(logPath, 'r');
+			const buffer = Buffer.alloc(newSize);
+			await fd.read(buffer, 0, newSize, state.lastPosition);
+			await fd.close();
+			state.lastPosition = stats.size;
+			this.logger.trace(`GLOBAL: Incremental read ${newSize} bytes (new position ${state.lastPosition}) from ${logPath}`);
+			return buffer.toString('utf-8');
+		} catch (error) {
+			this.logger.error(`GLOBAL: Error reading new content from ${logPath}: ${error}`);
+			return '';
+		}
+	}
+
+	/** Extract session/window identifiers from a log path */
+	private extractPathMetadata(logPath: string): { sessionId: string; windowId: string } {
+		const pathParts = logPath.split(path.sep);
+		const sessionIndex = pathParts.findIndex(part => part.match(/^[\d]{8}T[\d]{6}$/));
+		const sessionId = sessionIndex >= 0 ? pathParts[sessionIndex] : 'unknown';
+		const windowIndex = pathParts.findIndex(part => part.startsWith('window'));
+		const windowId = windowIndex >= 0 ? pathParts[windowIndex] : 'unknown';
+		return { sessionId, windowId };
 	}
 
 	/**
@@ -252,12 +331,14 @@ export class GlobalLogScanner {
 		watcherCount: number; 
 		callbackCount: number;
 		logRootCount: number;
+		trackedFileCount: number;
 	} {
 		return {
 			isWatchingGlobally: this.isWatchingGlobally,
 			watcherCount: this.globalWatchers.length,
 			callbackCount: this.globalEventCallbacks.length,
-			logRootCount: LogPathDiscovery.getVSCodeLogRootDirectories().length
+			logRootCount: LogPathDiscovery.getVSCodeLogRootDirectories().length,
+			trackedFileCount: this.fileStates.size
 		};
 	}
 
@@ -267,5 +348,7 @@ export class GlobalLogScanner {
 	dispose(): void {
 		this.stopGlobalWatching();
 		this.globalEventCallbacks = [];
+		this.fileStates.clear();
+		this.processingFiles.clear();
 	}
 }

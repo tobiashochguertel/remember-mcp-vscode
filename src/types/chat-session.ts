@@ -152,11 +152,7 @@ export const SESSION_SCAN_CONSTANTS = {
     
 	// File patterns
 	SESSION_FILE_PATTERN: /^[a-f0-9-]+\.json$/,
-    
-	// Scan limits
-	MAX_FILES_PER_SCAN: 1000,
-	MAX_FILE_SIZE_MB: 10,
-    
+        
 	// Debounce settings
 	DEFAULT_DEBOUNCE_MS: 500,
     

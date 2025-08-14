@@ -111,14 +111,6 @@ export class ChatSessionScanner {
 				const filePath = path.join(chatSessionsPath, fileName);
                 
 				try {
-					const stats = await fs.stat(filePath);
-                    
-					// Skip files that are too large
-					if (stats.size > SESSION_SCAN_CONSTANTS.MAX_FILE_SIZE_MB * 1024 * 1024) {
-						this.logger.debug(`Skipping large file: ${filePath} (${Math.round(stats.size / 1024 / 1024)}MB)`);
-						continue;
-					}
-                    
 					sessionFiles.push(filePath);
 				} catch (error) {
 					this.logger.error(`Error checking file ${filePath}: ${error}`);

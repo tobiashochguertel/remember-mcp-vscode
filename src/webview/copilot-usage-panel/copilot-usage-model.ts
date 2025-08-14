@@ -1,5 +1,5 @@
 import { UnifiedSessionDataService } from '../../services/unified-session-data-service';
-import { LogEntry } from '../../scanning/copilot-log-scanner';
+import { LogEntry } from '../../scanning/log-types';
 import { ILogger } from '../../types/logger';
 
 /**

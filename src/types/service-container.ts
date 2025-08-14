@@ -10,7 +10,8 @@ import { ILogger } from './logger';
 import { UnifiedSessionDataService, SessionDataServiceOptions } from '../services/unified-session-data-service';
 import { AnalyticsService } from '../services/analytics-service';
 import { ChatSessionScanner } from '../scanning/chat-session-scanner';
-import { CopilotLogScanner } from '../scanning/copilot-log-scanner';
+// Switched to GlobalLogScanner for unified monitoring across instances
+import { GlobalLogScanner } from '../scanning/global-log-scanner';
 import { SessionDataTransformer } from '../services/session-data-transformer';
 import { SESSION_SCAN_CONSTANTS } from './chat-session';
 
@@ -97,8 +98,8 @@ export class ServiceContainer {
 				}
 			);
 			
-			// Create log scanner (optional)
-			const logScanner = new CopilotLogScanner(this.logger, this.extensionContext);
+			// Create global log scanner (replaces prior CopilotLogScanner)
+			const logScanner = new GlobalLogScanner(this.logger);
 			
 			// Create session data transformer
 			const sessionTransformer = new SessionDataTransformer(
