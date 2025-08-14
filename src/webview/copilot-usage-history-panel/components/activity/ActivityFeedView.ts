@@ -20,6 +20,18 @@ export class ActivityFeedView implements ComponentView<ActivityFeedState, never>
 		if (!state.items.length) {
 			return '<section class="activity"><h4>Activity</h4><div class="empty">No recent activity</div></section>';
 		}
+
+		// Lightweight formatting: '2025-08-14T11:21:23.487Z' -> '2025-08-14 11:21:23'
+		const fmt = (iso: string): string => {
+			// Expect ISO 8601; extract date + time (seconds precision)
+			// Avoid Date parsing (keeps original UTC text) and stay cheap.
+			const m = iso.match(/^([0-9]{4}-[0-9]{2}-[0-9]{2})T([0-9]{2}:[0-9]{2}:[0-9]{2})/);
+			if (m) {
+				return `${m[1]} ${m[2]}`;
+			}
+			// Fallback: remove T, strip ms + Z if present
+			return iso.replace('T',' ').replace(/\.[0-9]{3}Z$/, '').replace(/Z$/,'');
+		};
 		return `
 			<section class="activity">
 				<h4>Activity</h4>
@@ -37,7 +49,7 @@ export class ActivityFeedView implements ComponentView<ActivityFeedState, never>
 					<tbody>
 						${state.items.map(i => `
 							<tr title="${i.type} • ${i.agent} • ${i.model}">
-								<td class="datetime" data-iso="${i.timeISO}">${i.timeISO}</td>
+								<td class="datetime" data-iso="${i.timeISO}">${fmt(i.timeISO)}</td>
 								<td>${i.type}</td>
 								<td>${i.agent}</td>
 								<td>${i.model}</td>
