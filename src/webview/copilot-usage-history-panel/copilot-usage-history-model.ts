@@ -263,10 +263,7 @@ export class CopilotUsageHistoryModel {
 			// Apply the same date filtering as refreshAllData
 			const settings = await this.getSettings();
 			const dateRange = this.getDateRangeForTimespan(settings.defaultTimeRange);
-			const filteredEvents = events.filter(e => {
-				const t = new Date(e.timestamp);
-				return t >= dateRange.start && t <= dateRange.end;
-			});
+			const filteredEvents = events.filter(e => e.timestamp >= dateRange.start && e.timestamp <= dateRange.end);
 			
 			this.logger.info(`Real-time filtered events: ${filteredEvents.length} events`);
 			await this.processSessionEvents(filteredEvents);
@@ -340,10 +337,7 @@ export class CopilotUsageHistoryModel {
 			const testTimeSeries = this.analyticsService.getTimeSeries(filter);
 			this.logger.info(`[DEBUG] refreshAllData: analytics timeSeries length after ingest = ${testTimeSeries.length}`);
 			
-			const events = allEvents.filter(e => {
-				const t = new Date(e.timestamp);
-				return t >= dateRange.start && t <= dateRange.end;
-			});
+			const events = allEvents.filter(e => e.timestamp >= dateRange.start && e.timestamp <= dateRange.end);
 			
 			this.logger.info(`[DEBUG] refreshAllData: filtered events.length = ${events.length}`);
 			
@@ -800,10 +794,7 @@ export class CopilotUsageHistoryModel {
 		const effective = (gf.timeRange === 'all' ? '90d' : gf.timeRange) as AnalyticsTimeRange;
 		const dateRange = this.getDateRangeForTimespan(effective);
 		const allEvents = await this.unifiedService.getSessionEvents();
-		const events = allEvents.filter(e => {
-			const t = new Date(e.timestamp);
-			return t >= dateRange.start && t <= dateRange.end;
-		});
+		const events = allEvents.filter(e => e.timestamp >= dateRange.start && e.timestamp <= dateRange.end);
 		const filter = { timeRange: effective } as const;
 		this.logger.debug?.('[Export] Using filters for export', { filters: gf, effective });
 		return {
@@ -955,8 +946,8 @@ export class CopilotUsageHistoryModel {
 		let oldestEvent: string | undefined;
 		let newestEvent: string | undefined;
 		if (allEvents.length > 0) {
-			oldestEvent = allEvents[0].timestamp;
-			newestEvent = allEvents[allEvents.length - 1].timestamp;
+			oldestEvent = allEvents[0].timestamp.toISOString();
+			newestEvent = allEvents[allEvents.length - 1].timestamp.toISOString();
 		}
 		const totalSizeBytes = JSON.stringify(allEvents).length;
 		return { totalFiles: 0, totalSizeBytes, oldestEvent, newestEvent };
@@ -977,9 +968,9 @@ export class CopilotUsageHistoryModel {
 		const weekStart = new Date(now.getTime() - now.getDay() * 24 * 60 * 60 * 1000);
 		const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-		const eventsToday = events.filter(e => new Date(e.timestamp) >= today).length;
-		const eventsThisWeek = events.filter(e => new Date(e.timestamp) >= weekStart).length;
-		const eventsThisMonth = events.filter(e => new Date(e.timestamp) >= monthStart).length;
+		const eventsToday = events.filter(e => e.timestamp >= today).length;
+		const eventsThisWeek = events.filter(e => e.timestamp >= weekStart).length;
+		const eventsThisMonth = events.filter(e => e.timestamp >= monthStart).length;
 
 		// Average session duration (approx based on events per session)
 		const sessions = new Map<string, CopilotUsageEvent[]>();
@@ -992,8 +983,8 @@ export class CopilotUsageHistoryModel {
 		if (sessions.size > 0) {
 			let sum = 0;
 			for (const arr of sessions.values()) {
-				const sorted = arr.slice().sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-				const d = new Date(sorted[sorted.length - 1].timestamp).getTime() - new Date(sorted[0].timestamp).getTime();
+				const sorted = arr.slice().sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime());
+				const d = sorted[sorted.length - 1].timestamp.getTime() - sorted[0].timestamp.getTime();
 				sum += d;
 			}
 			avgDuration = sum / sessions.size;
@@ -1008,7 +999,7 @@ export class CopilotUsageHistoryModel {
 		const topModel = Array.from(modelCounts.entries()).sort((a,b) => b[1]-a[1])[0]?.[0] || 'None';
 
 		const lastEvent = events[events.length - 1];
-		const lastEventTime = lastEvent ? lastEvent.timestamp : undefined;
+		const lastEventTime = lastEvent ? lastEvent.timestamp.toISOString() : undefined;
 
 		return {
 			totalEvents: events.length,

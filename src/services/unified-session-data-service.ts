@@ -118,8 +118,8 @@ export class UnifiedSessionDataService {
 					sessionEvents.push(...events);
 				}
 
-				// Sort session events by timestamp
-				sessionEvents.sort((a: CopilotUsageEvent, b: CopilotUsageEvent) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+				// Sort session events by timestamp (timestamp is already a Date)
+				sessionEvents.sort((a: CopilotUsageEvent, b: CopilotUsageEvent) => a.timestamp.getTime() - b.timestamp.getTime());
 
 				// No initial log scanning - we only watch log files for real-time events
 				const logEntries: LogEntry[] = [];
@@ -231,7 +231,7 @@ export class UnifiedSessionDataService {
 					this.cachedSessionEvents.push(...newEvents);
                     
 					// Sort by timestamp
-					this.cachedSessionEvents.sort((a: CopilotUsageEvent, b: CopilotUsageEvent) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+					this.cachedSessionEvents.sort((a: CopilotUsageEvent, b: CopilotUsageEvent) => a.timestamp.getTime() - b.timestamp.getTime());
                     
 					this.logger.trace(`REAL-TIME  Cache updated from ${beforeCount} to ${this.cachedSessionEvents.length} events`);
 				});

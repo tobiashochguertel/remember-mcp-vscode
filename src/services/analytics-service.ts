@@ -79,7 +79,7 @@ export class AnalyticsService {
 				}
 			}
 			// keep stable order by timestamp
-			this.events.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+			this.events.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 		}
 		this.logger.debug(`[AnalyticsService] Ingested ${events.length} events (total: ${this.events.length})`);
 	}
@@ -120,7 +120,7 @@ export class AnalyticsService {
 				const latencyMsMedian = this.median(latencies) ?? 0;
 				const edits = arr.filter(e => e.type === 'edit').length;
 				const editRatio = arr.length > 0 ? edits / arr.length : 0;
-				const series7d = days.map(d => arr.filter(e => e.timestamp.startsWith(d)).length);
+				const series7d = days.map(d => arr.filter(e => e.timestamp.toISOString().startsWith(d)).length);
 				return { id, count: arr.length, latencyMsMedian, editRatio, series7d };
 			})
 			.sort((a, b) => b.count - a.count);
@@ -167,7 +167,7 @@ export class AnalyticsService {
 			.slice(-limit)
 			.reverse()
 			.map(e => ({
-				timeISO: e.timestamp,
+				timeISO: e.timestamp.toISOString(),
 				type: e.type,
 				agent: e.agent || 'unknown',
 				model: e.model || 'unknown',
@@ -183,7 +183,7 @@ export class AnalyticsService {
 		const evs = this.applyFilter(this.events, filter);
 		const byDay = new Map<string, { total: number; byType: Record<string, number> }>();
 		for (const e of evs) {
-			const key = e.timestamp.split('T')[0];
+			const key = e.timestamp.toISOString().split('T')[0];
 			if (!byDay.has(key)) {
 				byDay.set(key, { total: 0, byType: {} });
 			}
@@ -234,7 +234,7 @@ export class AnalyticsService {
 				start = new Date(end.getTime() - 90 * 24 * 60 * 60 * 1000);
 			}
 			evs = evs.filter(e => {
-				const t = new Date(e.timestamp).getTime();
+				const t = e.timestamp.getTime();
 				return t >= start.getTime() && t <= end.getTime();
 			});
 		}

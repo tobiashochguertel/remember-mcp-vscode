@@ -5,7 +5,7 @@
 
 export interface CopilotUsageEvent {
 	id: string;                    // Deterministic ID for deduplication
-	timestamp: string;             // ISO8601 timestamp
+	timestamp: Date;               // Event time (full precision Date object). Use toISOString() for serialization / display.
 	type: 'chat' | 'completion' | 'edit' | 'explain';
 	source: 'copilot-chat' | 'copilot-inline' | 'copilot-sidebar';
 	requestId?: string;            // Original request ID within the session (for drill-in)

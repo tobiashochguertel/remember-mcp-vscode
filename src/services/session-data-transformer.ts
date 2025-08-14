@@ -97,7 +97,7 @@ export class SessionDataTransformer {
         
 		const event: CopilotUsageEvent = {
 			id,
-			timestamp: new Date(request.timestamp).toISOString(), // Convert unix timestamp to ISO string
+			timestamp: new Date(typeof request.timestamp === 'number' && request.timestamp < 1e12 ? request.timestamp * 1000 : request.timestamp), // Normalize seconds to ms, store as Date
 			type: eventType,
 			source: 'copilot-chat',
 			requestId: request.requestId,

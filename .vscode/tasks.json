@@ -26,32 +26,11 @@
 			}
 		},
 		{
-			"label": "npm watch-tests",
-			"type": "shell",
-			"command": "npm",
-			"args": ["run", "watch-tests"],
-			"problemMatcher": "$tsc-watch",
-			"isBackground": true,
-			"presentation": {
-				"reveal": "never",
-				"group": "watchers"
-			},
-			"group": "build"
-		},
-		{
 			"label": "npm compile",
 			"type": "shell",
 			"command": "npm",
 			"args": ["run", "compile"],
 			"group": "build",
-			"problemMatcher": "$tsc"
-		},
-		{
-			"label": "npm test",
-			"type": "shell",
-			"command": "npm",
-			"args": ["run", "test"],
-			"group": "test",
 			"problemMatcher": "$tsc"
 		},
 		{
@@ -61,13 +40,6 @@
 			"args": ["run", "lint"],
 			"group": "build"
 		},
-		{
-			"label": "tasks: watch-tests",
-			"dependsOn": [
-				"npm watch",
-				"npm watch-tests"
-			],
-			"problemMatcher": []
-		}
+		
 	]
 }
