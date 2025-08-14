@@ -65,8 +65,6 @@ export class CopilotUsageHistoryView {
 			return this.generateSimpleNoDataHtml();
 		}
 
-		const chartJsUri = this.getChartJsUri();
-
 		// Get analytics data from model for charts
 		const analyticsData = {
 			timeSeriesData: this.getTimeSeriesData(),
@@ -79,9 +77,9 @@ export class CopilotUsageHistoryView {
 		<head>
 			<meta charset="UTF-8">
 			<meta name="viewport" content="width=device-width, initial-scale=1.0">
-			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'unsafe-eval' vscode-resource:; font-src 'self' data:;">
+			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' ${this._webview.cspSource}; style-src 'unsafe-inline' ${this._webview.cspSource}; img-src ${this._webview.cspSource} data:; font-src 'self' data:;">
 			<title>Copilot Usage History</title>
-			<script src="${chartJsUri}"></script>
+			<script src="${this.getChartJsUri()}"></script>
 			${this.getWebviewStyles()}
 		</head>
 		<body>
@@ -94,7 +92,6 @@ export class CopilotUsageHistoryView {
 				${this.generateDebugSection()}
 				${this.generateScanProgress()}
 			</div>
-
 			<script>
 				${this.getWebviewScript(analyticsData)}
 			</script>
@@ -107,118 +104,116 @@ export class CopilotUsageHistoryView {
 	 */
 	private generateSimpleNoDataHtml(): string {
 		return `<!DOCTYPE html>
-		<html lang="en">
-		<head>
-			<meta charset="UTF-8">
-			<meta name="viewport" content="width=device-width, initial-scale=1.0">
-			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'unsafe-eval' vscode-resource:; font-src 'self' data:;">
-			<title>Copilot Usage History</title>
-			${this.getWebviewStyles()}
-			<style>
-				.empty-state {
-					padding: 32px 24px;
-					text-align: center;
-					color: var(--vscode-foreground);
-				}
-				
-				.empty-state h2 {
-					font-size: 18px;
-					font-weight: 600;
-					margin: 0 0 8px 0;
-					color: var(--vscode-foreground);
-				}
-				
-				.empty-state .description {
-					font-size: 13px;
-					color: var(--vscode-descriptionForeground);
-					margin-bottom: 24px;
-					line-height: 1.4;
-				}
-				
-				.cta-button {
-					background-color: var(--vscode-button-background);
-					color: var(--vscode-button-foreground);
-					border: none;
-					border-radius: 2px;
-					padding: 10px 16px;
-					font-size: 13px;
-					font-weight: 500;
-					cursor: pointer;
-					font-family: var(--vscode-font-family);
-					margin-bottom: 16px;
-					width: 200px;
-					transition: background-color 0.2s ease;
-				}
-				
-				.cta-button:hover {
-					background-color: var(--vscode-button-hoverBackground);
-				}
-				
-				.cta-button:focus {
-					outline: 1px solid var(--vscode-focusBorder);
-					outline-offset: 2px;
-				}
-				
-				.cta-button:disabled {
-					background-color: var(--vscode-button-secondaryBackground);
-					color: var(--vscode-button-secondaryForeground);
-					cursor: not-allowed;
-					opacity: 0.6;
-				}
-				
-				.cta-button:disabled:hover {
-					background-color: var(--vscode-button-secondaryBackground);
-				}
-				
-				.secondary-action {
-					font-size: 12px;
-					color: var(--vscode-descriptionForeground);
-					margin-top: 16px;
-				}
-				
-				.secondary-action a {
-					color: var(--vscode-textLink-foreground);
-					text-decoration: none;
-				}
-				
-				.secondary-action a:hover {
-					text-decoration: underline;
-				}
-			</style>
-		</head>
-		<body>
-			<div class="empty-state">
-				<h2>No Copilot Usage Data... Yet!</h2>
-				<div class="description">
-					Track and analyze your entire Copilot usage history! See all your coding sessions, 
-					chat interactions, and productivity patterns. Press the button to get started with 
-					scanning your chat sessions for usage events.
-				</div>
-				
-				<button class="cta-button" id="scanButton" ${this._model.globalState.isScanning ? 'disabled' : ''}>
-					${this._model.globalState.isScanning ? 'Scanning...' : 'Scan Chat Sessions'}
-				</button>
-			</div>
-			
-			${WebviewUtils.getSharedScript()}
-			<script>
-				// Add event listener instead of inline onclick
-				document.addEventListener('DOMContentLoaded', function() {
-					const scanButton = document.getElementById('scanButton');
-					if (scanButton) {
-						scanButton.addEventListener('click', function() {
-							if (scanButton.disabled) {
-								console.log('Button is disabled, ignoring click');
-								return;
-							}
-							console.log('Button clicked');
-							sendMessage('scanChatSessions');
-						});
-					}
-				});
-			</script>
-		</body>
-		</html>`;
+		   <html lang="en">
+		   <head>
+			   <meta charset="UTF-8">
+			   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' ${this._webview.cspSource}; style-src 'unsafe-inline' ${this._webview.cspSource}; img-src ${this._webview.cspSource} data:; font-src 'self' data:;">
+			   ${this.getWebviewStyles()}
+			   <style>
+				   .empty-state {
+					   padding: 32px 24px;
+					   text-align: center;
+					   color: var(--vscode-foreground);
+				   }
+               
+				   .empty-state h2 {
+					   font-size: 18px;
+					   font-weight: 600;
+					   margin: 0 0 8px 0;
+					   color: var(--vscode-foreground);
+				   }
+               
+				   .empty-state .description {
+					   font-size: 13px;
+					   color: var(--vscode-descriptionForeground);
+					   margin-bottom: 24px;
+					   line-height: 1.4;
+				   }
+               
+				   .cta-button {
+					   background-color: var(--vscode-button-background);
+					   color: var(--vscode-button-foreground);
+					   border: none;
+					   border-radius: 2px;
+					   padding: 10px 16px;
+					   font-size: 13px;
+					   font-weight: 500;
+					   cursor: pointer;
+					   font-family: var(--vscode-font-family);
+					   margin-bottom: 16px;
+					   width: 200px;
+					   transition: background-color 0.2s ease;
+				   }
+               
+				   .cta-button:hover {
+					   background-color: var(--vscode-button-hoverBackground);
+				   }
+               
+				   .cta-button:focus {
+					   outline: 1px solid var(--vscode-focusBorder);
+					   outline-offset: 2px;
+				   }
+               
+				   .cta-button:disabled {
+					   background-color: var(--vscode-button-secondaryBackground);
+					   color: var(--vscode-button-secondaryForeground);
+					   cursor: not-allowed;
+					   opacity: 0.6;
+				   }
+               
+				   .cta-button:disabled:hover {
+					   background-color: var(--vscode-button-secondaryBackground);
+				   }
+               
+				   .secondary-action {
+					   font-size: 12px;
+					   color: var(--vscode-descriptionForeground);
+					   margin-top: 16px;
+				   }
+               
+				   .secondary-action a {
+					   color: var(--vscode-textLink-foreground);
+					   text-decoration: none;
+				   }
+               
+				   .secondary-action a:hover {
+					   text-decoration: underline;
+				   }
+			   </style>
+		   </head>
+		   <body>
+			   <div class="empty-state">
+				   <h2>No Copilot Usage Data... Yet!</h2>
+				   <div class="description">
+					   Track and analyze your entire Copilot usage history! See all your coding sessions, 
+					   chat interactions, and productivity patterns. Press the button to get started with 
+					   scanning your chat sessions for usage events.
+				   </div>
+               
+				   <button class="cta-button" id="scanButton" ${this._model.globalState.isScanning ? 'disabled' : ''}>
+					   ${this._model.globalState.isScanning ? 'Scanning...' : 'Scan Chat Sessions'}
+				   </button>
+			   </div>
+			   ${WebviewUtils.getSharedScript()}
+			   <script>
+				   // Add event listener instead of inline onclick
+				   document.addEventListener('DOMContentLoaded', function() {
+					   const scanButton = document.getElementById('scanButton');
+					   if (scanButton) {
+						   scanButton.addEventListener('click', function() {
+							   if (scanButton.disabled) {
+								   console.log('Button is disabled, ignoring click');
+								   return;
+							   }
+							   console.log('Button clicked');
+							   sendMessage('scanChatSessions');
+						   });
+					   }
+				   });
+			   </script>
+		   </body>
+		   </html>`;
 	}
 
 	/**
@@ -408,9 +403,12 @@ export class CopilotUsageHistoryView {
 	 * Get Chart.js URI
 	 */
 	private getChartJsUri(): string {
-		return this._webview.asWebviewUri(
-			vscode.Uri.joinPath(this._extensionUri, 'media', 'libs', 'node_modules', 'chart.js', 'dist', 'chart.umd.js')
+		const uri = this._webview.asWebviewUri(
+			vscode.Uri.joinPath(this._extensionUri, 'media', 'chart.umd.js')
 		).toString();
+		this._logger.debug(`Chart.js URI: ${uri}`);
+		this._logger.debug(`CSP Source: ${this._webview.cspSource}`);
+		return uri;
 	}
 
 	/**

@@ -29,7 +29,9 @@ export class CopilotUsagePanel implements vscode.WebviewViewProvider, vscode.Dis
 		// Configure webview options
 		webviewView.webview.options = {
 			enableScripts: true,
-			localResourceRoots: [this.extensionUri]
+			localResourceRoots: [
+				vscode.Uri.joinPath(this.extensionUri, 'media')
+			]
 		};
 
 		// Get unified data service from service container

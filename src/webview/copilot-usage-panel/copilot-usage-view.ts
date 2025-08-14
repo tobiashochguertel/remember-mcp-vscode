@@ -41,9 +41,9 @@ export class CopilotUsageView {
 		const tableRows = this.generateTableRows();
 		const sharedStyles = await WebviewUtils.getSharedStyles(this._extensionUri);
 
-		// Get Chart.js URI from media/libs/chart.umd.js
+		// Get Chart.js URI from media/chart.umd.js
 		const chartJsUri = this._webview.asWebviewUri(
-			vscode.Uri.joinPath(this._extensionUri, 'media', 'libs', 'chart.umd.js')
+			vscode.Uri.joinPath(this._extensionUri, 'media', 'chart.umd.js')
 		);
 
 		return `<!DOCTYPE html>
@@ -51,10 +51,8 @@ export class CopilotUsageView {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
             <title>Copilot Usage</title>
             ${sharedStyles}
-            <script src="${chartJsUri}"></script>
             <style>
                 tr {
                     background-color: var(--vscode-sideBar-background);

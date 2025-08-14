@@ -158,6 +158,9 @@ export class CopilotUsageHistoryModel {
 				canScan: true
 			}
 		};
+		
+		// DEBUG: Log initial filter control state
+		this.logger.info(`[DEBUG] Constructor: Initial filterControls.timeRange.current = ${this.filterControls.timeRange.current}`);
 
 		this.storageInfo = {
 			title: 'Storage Information',
@@ -187,10 +190,20 @@ export class CopilotUsageHistoryModel {
 	 * Set up callbacks for real-time data updates
 	 */
 	private setupDataCallbacks(): void {
-		// Session events callback
-		this._sessionEventsCallback = (events: CopilotUsageEvent[]) => {
+		// Session events callback - process events with current filter settings
+		this._sessionEventsCallback = async (events: CopilotUsageEvent[]) => {
 			this.logger.info(`Real-time session update: ${events.length} events`);
-			this.processSessionEvents(events);
+			
+			// Apply the same date filtering as refreshAllData
+			const settings = await this.getSettings();
+			const dateRange = this.getDateRangeForTimespan(settings.defaultTimeRange);
+			const filteredEvents = events.filter(e => {
+				const t = new Date(e.timestamp);
+				return t >= dateRange.start && t <= dateRange.end;
+			});
+			
+			this.logger.info(`Real-time filtered events: ${filteredEvents.length} events`);
+			await this.processSessionEvents(filteredEvents);
 		};
 
 		// Log entries callback  
@@ -234,16 +247,35 @@ export class CopilotUsageHistoryModel {
 
 			// Get current settings and data
 			const settings = await this.getSettings();
+			this.logger.info(`[DEBUG] refreshAllData: settings = ${JSON.stringify(settings)}`);
 			const dateRange = this.getDateRangeForTimespan(settings.defaultTimeRange);
 			const allEvents = await this.unifiedService.getSessionEvents();
+			
+			// DEBUG: Log the data flow
+			this.logger.info(`[DEBUG] refreshAllData: allEvents.length = ${allEvents.length}`);
+			this.logger.info(`[DEBUG] refreshAllData: dateRange = ${dateRange.start.toISOString()} to ${dateRange.end.toISOString()}`);
+			
+			// CRITICAL: Populate analytics service with all events
+			this.analyticsService.ingest(allEvents, { replace: true });
+			
+			// DEBUG: Verify analytics service state after ingest
+			const timeRange = settings.defaultTimeRange as AnalyticsTimeRange;
+			const filter = { timeRange } as const;
+			const testTimeSeries = this.analyticsService.getTimeSeries(filter);
+			this.logger.info(`[DEBUG] refreshAllData: analytics timeSeries length after ingest = ${testTimeSeries.length}`);
+			
 			const events = allEvents.filter(e => {
 				const t = new Date(e.timestamp);
 				return t >= dateRange.start && t <= dateRange.end;
 			});
+			
+			this.logger.info(`[DEBUG] refreshAllData: filtered events.length = ${events.length}`);
+			
 			const storageStats = await this.computeStorageStats(allEvents);
-
-			// Update filter controls first
+			
+			// Update filter controls FIRST - before processSessionEvents needs them
 			this.updateFilterControls(settings, dateRange);
+			this.logger.info(`[DEBUG] refreshAllData: after updateFilterControls, timeRange.current = ${this.filterControls.timeRange.current}`);
 
 			// Process events and update all micro-view-models
 			await this.processSessionEvents(events);
@@ -274,13 +306,25 @@ export class CopilotUsageHistoryModel {
 	 */
 	private async processSessionEvents(events: CopilotUsageEvent[]): Promise<void> {
 		console.log('Model.processSessionEvents: Processing', events.length, 'events');
+		this.logger.info(`[DEBUG] processSessionEvents: events.length = ${events.length}`);
 		
-		// Calculate analytics using AnalyticsService
-		const timeRange = this.filterControls.timeRange.current as AnalyticsTimeRange;
+		// Get settings directly instead of relying on filter controls that might be stale
+		const settings = await this.getSettings();
+		const timeRange = settings.defaultTimeRange as AnalyticsTimeRange;
 		const filter = { timeRange } as const;
+		
+		this.logger.info(`[DEBUG] processSessionEvents: this.filterControls.timeRange.current = ${this.filterControls.timeRange.current}`);
+		this.logger.info(`[DEBUG] processSessionEvents: settings.defaultTimeRange = ${settings.defaultTimeRange}`);
+		this.logger.info(`[DEBUG] processSessionEvents: timeRange variable = ${timeRange}`);
+		this.logger.info(`[DEBUG] processSessionEvents: filter = ${JSON.stringify(filter)}`);
+		
 		const timeSeries = this.analyticsService.getTimeSeries(filter);
 		const languages = this.analyticsService.getLanguages(filter, 50);
 		const models = this.analyticsService.getModels(filter, 50);
+
+		this.logger.info(`[DEBUG] processSessionEvents: timeSeries.length = ${timeSeries.length}`);
+		this.logger.info(`[DEBUG] processSessionEvents: languages.length = ${languages.length}`);
+		this.logger.info(`[DEBUG] processSessionEvents: models.length = ${models.length}`);
 
 		const quickStats = this.calculateQuickStats(events);
 		
@@ -293,6 +337,7 @@ export class CopilotUsageHistoryModel {
         
 		console.log('Model.processSessionEvents: Analytics:', analytics);
 		console.log('Model.processSessionEvents: Quick stats:', quickStats);
+		this.logger.info(`[DEBUG] processSessionEvents: analytics.timeSeriesData.length = ${analytics.timeSeriesData.length}`);
 
 		// Update summary cards
 		this.updateSummaryCards(quickStats, events);
@@ -619,21 +664,33 @@ export class CopilotUsageHistoryModel {
 	}
 
 	// Utility methods
-	private getDateRangeForTimespan(timespan: '7d' | '30d' | '90d'): DateRange {
+	private getDateRangeForTimespan(timespan: AnalyticsTimeRange): DateRange {
 		const end = new Date();
-		const start = new Date();
+		let start = new Date();
 
+		// Calculate date range based on timespan
 		switch (timespan) {
+			case 'today':
+				// Start of today (00:00:00)
+				start = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+				break;
 			case '7d':
-				start.setDate(start.getDate() - 7);
+				start.setDate(end.getDate() - 7);
 				break;
 			case '30d':
-				start.setDate(start.getDate() - 30);
+				start.setDate(end.getDate() - 30);
 				break;
 			case '90d':
-				start.setDate(start.getDate() - 90);
+				start.setDate(end.getDate() - 90);
+				break;
+			case 'all':
+				// Start from epoch for all data
+				start = new Date(0);
 				break;
 		}
+
+		// DEBUG: Add logging to verify date calculation
+		console.log(`[DEBUG] getDateRangeForTimespan(${timespan}): start=${start.toISOString()}, end=${end.toISOString()}`);
 
 		return { start, end };
 	}

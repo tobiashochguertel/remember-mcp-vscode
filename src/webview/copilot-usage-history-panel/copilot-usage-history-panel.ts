@@ -33,7 +33,9 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 		// Configure webview options
 		webviewView.webview.options = {
 			enableScripts: true,
-			localResourceRoots: [this.extensionUri]
+			localResourceRoots: [
+				vscode.Uri.joinPath(this.extensionUri, 'media')
+			]
 		};
 
 		try {
