@@ -703,7 +703,7 @@ export class CopilotUsageHistoryModel {
 	/**
 	 * Update time range setting
 	 */
-	public async updateTimeRange(timeRange: '7d' | '30d' | '90d'): Promise<void> {
+	public async updateTimeRange(timeRange: 'today' | '7d' | '30d' | '90d'): Promise<void> {
 		await this.updateSettings({ defaultTimeRange: timeRange });
 		await this.refreshAllData();
 	}
@@ -871,13 +871,13 @@ export class CopilotUsageHistoryModel {
 	}
 
 	// ---------- New helpers using AnalyticsService / Unified data ----------
-	private async getSettings(): Promise<{ defaultTimeRange: '7d' | '30d' | '90d' }> {
+	private async getSettings(): Promise<{ defaultTimeRange: 'today' | '7d' | '30d' | '90d' }> {
 		const key = 'copilot-usage-history-settings';
-		const stored = this.extensionContext.globalState.get<{ defaultTimeRange: '7d' | '30d' | '90d' }>(key);
+		const stored = this.extensionContext.globalState.get<{ defaultTimeRange: 'today' | '7d' | '30d' | '90d' }>(key);
 		return stored || { defaultTimeRange: '30d' };
 	}
 
-	private async updateSettings(update: Partial<{ defaultTimeRange: '7d' | '30d' | '90d' }>): Promise<void> {
+	private async updateSettings(update: Partial<{ defaultTimeRange: 'today' | '7d' | '30d' | '90d' }>): Promise<void> {
 		const key = 'copilot-usage-history-settings';
 		const current = await this.getSettings();
 		await this.extensionContext.globalState.update(key, { ...current, ...update });

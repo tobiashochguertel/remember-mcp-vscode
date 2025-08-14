@@ -1,7 +1,7 @@
 import { ComponentView } from '../shared/ComponentBase';
 
 export interface FiltersState {
-	timeRange: 'today' | '7d' | '30d' | '90d';
+	timeRange: 'today' | '7d' | '30d' | '90d' | 'all';
 	workspace: 'current' | 'all';
 	agentId?: string;
 	modelId?: string;
@@ -26,7 +26,8 @@ export class FiltersView implements ComponentView<FiltersState, FiltersActions> 
 			{ v: 'today', l: 'Today' },
 			{ v: '7d', l: 'Last 7d' },
 			{ v: '30d', l: 'Last 30d' },
-			{ v: '90d', l: 'Last 90d' }
+			{ v: '90d', l: 'Last 90d' },
+			{ v: 'all', l: 'All Time' }
 		];
 		const wsOptions = [
 			{ v: 'current', l: 'Current' },

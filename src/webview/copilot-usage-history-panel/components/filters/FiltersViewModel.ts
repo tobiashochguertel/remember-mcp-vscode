@@ -22,15 +22,16 @@ export class FiltersViewModel implements ComponentViewModel<FiltersState, Filter
 		this.state = initial;
 
 		// Async sync with stored settings after state assignment
+		const self = this;
 		(async () => {
 			try {
 				const settings = await (model as any).getSettings();
-				if (settings?.defaultTimeRange && this.state.timeRange !== settings.defaultTimeRange) {
-					this.state = { ...this.state, timeRange: settings.defaultTimeRange };
-					this.notify();
+				if (settings?.defaultTimeRange && self.state.timeRange !== settings.defaultTimeRange) {
+					self.state = { ...self.state, timeRange: settings.defaultTimeRange };
+					self.notify();
 				}
 			} catch (e) {
-				this.logger.warn?.('FiltersViewModel settings sync failed', e);
+				self.logger.warn?.('FiltersViewModel settings sync failed', e);
 			}
 		})();
 	}
@@ -60,16 +61,14 @@ export class FiltersViewModel implements ComponentViewModel<FiltersState, Filter
 					this.state = { ...this.state, ...event.patch };
 					this.notify();
 					if (event.patch.timeRange && event.patch.timeRange !== prev.timeRange) {
-						// Map unsupported values to closest supported for model
-						let mapped: '7d' | '30d' | '90d' = '30d';
-						if (event.patch.timeRange === '7d') {
-							mapped = '7d';
-						} else if (event.patch.timeRange === '90d') {
-							mapped = '90d';
-						} else if (event.patch.timeRange === 'today') {
-							mapped = '7d';
+						const tr = event.patch.timeRange;
+						if (tr === 'all') {
+							// Persist a sentinel (use '90d' internally for settings) then fetch full range via refresh
+							await this.model.updateTimeRange('90d');
+							// Additional handling for 'all' could be added later if model/settings extended
+						} else {
+							await this.model.updateTimeRange(tr as 'today' | '7d' | '30d' | '90d');
 						}
-						await this.model.updateTimeRange(mapped);
 					} else {
 						await this.model.refreshAllData();
 					}

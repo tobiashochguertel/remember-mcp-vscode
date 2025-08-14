@@ -153,16 +153,12 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 		if (!this._model) {return;}
 
 		try {
-			// model currently only supports subset; map unsupported to closest
-			let mapped: '7d' | '30d' | '90d';
-			if (timeRange === 'today') {
-				mapped = '7d';
-			} else if (timeRange === 'all') {
-				mapped = '90d'; // temporary until model supports 'all'
+			if (timeRange === 'all') {
+				// Use max configured window for now; future enhancement could load all stored events directly
+				await this._model.updateTimeRange('90d');
 			} else {
-				mapped = timeRange;
+				await this._model.updateTimeRange(timeRange);
 			}
-			await this._model.updateTimeRange(mapped);
 			this.logger.info(`Time range updated to ${timeRange}`);
 		} catch (error) {
 			this.logger.error('Error updating time range:', error);
