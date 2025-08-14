@@ -66,7 +66,7 @@ export interface AnalyticsTableViewModel {
  */
 export interface FilterControlsViewModel {
 	timeRange: {
-		current: '7d' | '30d' | '90d';
+		current: 'today' | '7d' | '30d' | '90d' | 'all';
 		options: Array<{ value: string; label: string; selected: boolean }>;
 	};
 	dateRange: {

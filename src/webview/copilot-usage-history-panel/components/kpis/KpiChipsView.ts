@@ -24,8 +24,31 @@ export class KpiChipsView implements ComponentView<KpiChipsState, never> {
 			{ label: 'Agents', value: state.agents }
 		];
 		return `
-			<div class="kpi-chips">
-				${items.map(i => `<div class="kpi-chip"><span class="kpi-label">${i.label}</span><span class="kpi-value">${i.value}</span></div>`).join('')}
+			<div style="
+				display: grid; 
+				grid-template-columns: 1fr 1fr; 
+				gap: 1px; 
+				margin-bottom: 16px;
+			">
+				${items.map(i => `
+					<div style="
+						background-color: var(--vscode-panel-background);
+						border: 1px solid var(--vscode-panel-border);
+						padding: 8px;
+						text-align: left;
+					">
+						<div style="
+							font-size: 11px;
+							color: var(--vscode-descriptionForeground);
+							margin-bottom: 2px;
+						">${i.label}</div>
+						<div style="
+							font-size: 16px;
+							font-weight: bold;
+							color: var(--vscode-foreground);
+						">${i.value}</div>
+					</div>
+				`).join('')}
 			</div>
 		`;
 	}

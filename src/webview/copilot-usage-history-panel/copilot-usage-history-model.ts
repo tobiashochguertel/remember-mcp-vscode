@@ -135,11 +135,13 @@ export class CopilotUsageHistoryModel {
 
 		this.filterControls = {
 			timeRange: {
-				current: '30d',
+				current: 'today',
 				options: [
+					{ value: 'today', label: 'Today', selected: true },
 					{ value: '7d', label: 'Last 7 Days', selected: false },
-					{ value: '30d', label: 'Last 30 Days', selected: true },
-					{ value: '90d', label: 'Last 90 Days', selected: false }
+					{ value: '30d', label: 'Last 30 Days', selected: false },
+					{ value: '90d', label: 'Last 90 Days', selected: false },
+					{ value: 'all', label: 'All Time', selected: false }
 				]
 			},
 			dateRange: {
@@ -204,6 +206,16 @@ export class CopilotUsageHistoryModel {
 			
 			this.logger.info(`Real-time filtered events: ${filteredEvents.length} events`);
 			await this.processSessionEvents(filteredEvents);
+
+			// Update global state to reflect new data availability
+			this.globalState = {
+				...this.globalState,
+				hasData: filteredEvents.length > 0 || this.globalState.hasData,
+				lastUpdated: new Date()
+			};
+
+			// Notify listeners of the change
+			this.notifyListeners();
 		};
 
 		// Log entries callback  

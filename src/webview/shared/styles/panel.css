@@ -10,11 +10,21 @@ body {
     padding: 8px;
 }
 
-h3 {
+h1, h2, h3 {
     margin: 0 0 8px 0;
     font-size: 13px;
     font-weight: 600;
     color: var(--vscode-sideBarTitle-foreground);
+}
+
+h1 {
+    font-size: 16px;
+    margin-bottom: 12px;
+}
+
+h2 {
+    font-size: 14px;
+    margin-bottom: 10px;
 }
 
 .summary {
@@ -92,4 +102,28 @@ button.secondary:not(:disabled) {
 
 button.secondary:not(:disabled):hover {
     background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+select {
+    background-color: var(--vscode-dropdown-background);
+    color: var(--vscode-dropdown-foreground);
+    border: 1px solid var(--vscode-dropdown-border);
+    padding: 4px 6px;
+    border-radius: 2px;
+    font-size: 12px;
+    font-family: var(--vscode-font-family);
+}
+
+select:focus {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: 1px;
+}
+
+.error {
+    color: var(--vscode-errorForeground);
+    background-color: var(--vscode-inputValidation-errorBackground);
+    border: 1px solid var(--vscode-inputValidation-errorBorder);
+    padding: 8px;
+    border-radius: 2px;
+    margin: 8px 0;
 }

@@ -73,8 +73,12 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 		try {
 			const unified = ServiceContainer.getInstance().getUnifiedSessionDataService();
 			// Fire and forget - don't await
-			unified.initialize().then(() => {
+			unified.initialize().then(async () => {
 				this.logger.info('Unified session data service initialized successfully');
+				// Now that the data service is ready, refresh the data
+				if (this._model) {
+					await this._model.refreshAllData();
+				}
 			}).catch((error: any) => {
 				this.logger.error('Unified data service initialization failed:', error);
 			});
