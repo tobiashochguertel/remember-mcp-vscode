@@ -18,6 +18,8 @@ import { ILogger } from '../types/logger';
 export interface SessionDataServiceOptions {
 	enableRealTimeUpdates?: boolean;
 	debounceMs?: number;
+	// Backward/forward compatibility: some callers may still specify window log scanning toggle
+	enableWindowLogScanning?: boolean; // deprecated/no-op for now
 }
 
 export class UnifiedSessionDataService {
@@ -42,6 +44,10 @@ export class UnifiedSessionDataService {
 	private cachedSessionEvents: CopilotUsageEvent[] = [];
 	private cachedLogEntries: LogEntry[] = [];
 	private lastScanStats?: SessionScanStats;
+	private historicalLogsLoaded = false;
+
+	/** Indicates whether historical global logs were loaded into cache */
+	isHistoricalLogsLoaded(): boolean { return this.historicalLogsLoaded; }
 
 	constructor(
 		private readonly sessionScanner: ChatSessionScanner,
@@ -96,9 +102,98 @@ export class UnifiedSessionDataService {
 			}
             
 			this.isInitialized = true;
-			this.logger.info(`Initialized with ${scanResult.sessionEvents.length} session events, ${scanResult.logEntries.length} log entries`);
+			this.logger.info(`Initialized with ${scanResult.sessionEvents.length} session events, ${scanResult.logEntries.length} log entries (historical logs loaded: ${this.historicalLogsLoaded})`);
 			return scanResult;
 		});
+	}
+
+	/**
+	 * Perform a one-time historical global log scan and merge results into cachedLogEntries.
+	 * Safe to call multiple times; subsequent calls are no-ops unless force=true.
+	 */
+	async loadHistoricalLogs(force = false): Promise<number> {
+		if (!this.logScanner) {
+			this.logger.warn('Historical log load skipped: no global log scanner available');
+			return 0;
+		}
+		if (this.historicalLogsLoaded && !force) {
+			return 0;
+		}
+		try {
+			this.logger.info('Loading historical global Copilot logs...');
+			const result = await this.logScanner.scanAllHistoricalLogs();
+			const before = this.cachedLogEntries.length;
+			// Deduplicate while merging
+			const existingKey = new Set(this.cachedLogEntries.map(e => `${e.requestId}|${e.timestamp.getTime()}`));
+			for (const entry of result.logEntries) {
+				const key = `${entry.requestId}|${entry.timestamp.getTime()}`;
+				if (!existingKey.has(key)) {
+					this.cachedLogEntries.push(entry);
+					existingKey.add(key);
+				}
+			}
+			this.cachedLogEntries.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+			this.historicalLogsLoaded = true;
+			const added = this.cachedLogEntries.length - before;
+			this.logger.info(`Historical log load complete: added ${added} new log entries (total ${this.cachedLogEntries.length}).`);
+			return added;
+		} catch (err) {
+			this.logger.error(`Historical log load failed: ${err}`);
+			return 0;
+		}
+	}
+
+	/**
+	 * Produce per-day counts of session requests vs log entries for last N days (default 3).
+	 * This triggers a fresh session scan to get authoritative request counts, and (if not yet loaded)
+	 * loads historical logs before counting log entries.
+	 */
+	async getDailyRequestComparison(days = 3): Promise<Array<{ date: string; sessionRequests: number; logEntries: number }>> {
+		if (days < 1) { days = 1; }
+		// Ensure historical logs included
+		await this.loadHistoricalLogs(false);
+		// Fresh scan of sessions to get raw request timestamps
+		const { results } = await this.sessionScanner.scanAllSessions();
+		// Build date buckets
+		const today = new Date();
+		const targetDates: string[] = [];
+		for (let i = 0; i < days; i++) {
+			const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+			targetDates.push(d.toISOString().slice(0, 10)); // YYYY-MM-DD
+		}
+		const sessionCounts = new Map<string, number>();
+		const logCounts = new Map<string, number>();
+		for (const ts of targetDates) { sessionCounts.set(ts, 0); logCounts.set(ts, 0); }
+		// Session requests
+		for (const r of results) {
+			for (const req of r.session.requests) {
+				const dateStr = new Date(req.timestamp).toISOString().slice(0, 10);
+				if (sessionCounts.has(dateStr)) {
+					sessionCounts.set(dateStr, (sessionCounts.get(dateStr) || 0) + 1);
+				}
+			}
+		}
+		// Log entries (cached)
+		for (const entry of this.cachedLogEntries) {
+			const dateStr = entry.timestamp.toISOString().slice(0, 10);
+			if (logCounts.has(dateStr)) {
+				logCounts.set(dateStr, (logCounts.get(dateStr) || 0) + 1);
+			}
+		}
+		return targetDates.map(date => ({
+			date,
+			sessionRequests: sessionCounts.get(date) || 0,
+			logEntries: logCounts.get(date) || 0
+		}));
+	}
+
+	/** Log comparison report to logger */
+	async logRecentDailyComparison(days = 3): Promise<void> {
+		const rows = await this.getDailyRequestComparison(days);
+		this.logger.info(`Daily request comparison (last ${days} day(s)) - historical logs loaded: ${this.historicalLogsLoaded}`);
+		for (const row of rows) {
+			this.logger.info(`${row.date}: ${row.sessionRequests} requests from sessions, ${row.logEntries} entries from logs`);
+		}
 	}
 
 	/**

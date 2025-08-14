@@ -541,6 +541,24 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
+	// Command: scan edit state timelines
+	const scanEditStatesCommand = vscode.commands.registerCommand('remember-mcp.scanEditStates', async () => {
+		try {
+			const container = ServiceContainer.getInstance();
+			const scanner = container.getEditStateScanner();
+			logger.info('Starting edit state scan (manual command)...');
+			const { results, stats } = await scanner.scanAllEditStates();
+			logger.info(`Edit state scan complete: ${stats.totalStateFiles} state files, ${stats.totalTurns} turns, ${stats.errorFiles} errors in ${stats.scanDuration}ms`);
+			if (results.length > 0) {
+				logger.info(`Sample state file: ${results[0].stateFilePath}`);
+			}
+			vscode.window.showInformationMessage(`Edit state scan: ${stats.totalStateFiles} files / ${stats.totalTurns} turns`);
+		} catch (err) {
+			logger.error(`Edit state scan failed: ${err}`);
+			vscode.window.showErrorMessage(`Edit state scan failed: ${err}`);
+		}
+	});
+
 
 
 	// Add all disposables
@@ -557,6 +575,7 @@ export function activate(context: vscode.ExtensionContext) {
 		clearUsageHistoryCommand,
 		scanChatSessionsCommand,
 		exportUsageDataCommand
+		,scanEditStatesCommand
 	);
 
 	// Auto-start MCP server if configured
@@ -603,6 +622,19 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Add to subscriptions
 	context.subscriptions.push(debugLogCommand);
+
+	// Command: report recent daily comparison of session vs log counts (last 3 days)
+	const compareRecentCommand = vscode.commands.registerCommand('remember-mcp.compareRecentRequestCounts', async () => {
+		try {
+			const unified = ServiceContainer.getInstance().getUnifiedSessionDataService();
+			await unified.loadHistoricalLogs(false);
+			await unified.logRecentDailyComparison(3);
+			vscode.window.showInformationMessage('Recent request count comparison logged to output');
+		} catch (err) {
+			logger.error(`Comparison command failed: ${err}`);
+		}
+	});
+	context.subscriptions.push(compareRecentCommand);
     
 	// Dispose usage history panel on deactivate
 	context.subscriptions.push({
