@@ -10,10 +10,14 @@ export interface AgentItem {
 
 export interface AgentsListState {
 	items: AgentItem[];
+	isLoading?: boolean;
 }
 
 export class AgentsListView implements ComponentView<AgentsListState, never> {
 	render(state: AgentsListState): string {
+		if (state.isLoading) {
+			return '<section class="agents"><h4>Agents</h4><div class="empty">Loading...</div></section>';
+		}
 		if (!state.items.length) {
 			return '<section class="agents"><h4>Agents</h4><div class="empty">No data</div></section>';
 		}

@@ -143,43 +143,33 @@ export class CopilotUsageHistoryView {
 			chips: vmState.chips.map(c => ({ label: c.label, value: c.value })),
 			isLoading: vmState.isLoading
 		};
-		return `
-			<h2>Key Metrics</h2>
-			${this.kpiChipsView.render(renderState)}
-		`;
+		// Intentionally no heading for KPI chips (design choice)
+		return this.kpiChipsView.render(renderState);
 	}
 
 	/**
 	 * Generate agents section using AgentsListView component
 	 */
 	private generateAgentsSection(): string {
-		// TODO: Get actual agents data from model
-		return `
-			<h2>Top Agents</h2>
-			<div style="color: var(--vscode-descriptionForeground); font-style: italic;">Agents list component will be rendered here</div>
-		`;
+		const vm = this._model.agentsListViewModel;
+		const vmState = vm.getState();
+		return this.agentsListView.render({ items: vmState.items, isLoading: vmState.isLoading });
 	}
 
 	/**
 	 * Generate models section using ModelsListView component
 	 */
 	private generateModelsSection(): string {
-		// TODO: Get actual models data from model
-		return `
-			<h2>Top Models</h2>
-			<div style="color: var(--vscode-descriptionForeground); font-style: italic;">Models list component will be rendered here</div>
-		`;
+		const vmState = this._model.modelsListViewModel.getState();
+		return this.modelsListView.render({ items: vmState.items });
 	}
 
 	/**
 	 * Generate activity section using ActivityFeedView component
 	 */
 	private generateActivitySection(): string {
-		// TODO: Get actual activity data from model
-		return `
-			<h2>Recent Activity</h2>
-			<div style="color: var(--vscode-descriptionForeground); font-style: italic;">Activity feed component will be rendered here</div>
-		`;
+		// TODO: Wire activity view model
+		return '<section class="activity"><h4>Activity</h4><div class="empty" style="color: var(--vscode-descriptionForeground);">Activity feed component will be rendered here</div></section>';
 	}
 
 	/**

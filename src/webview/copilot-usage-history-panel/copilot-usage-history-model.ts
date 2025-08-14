@@ -4,6 +4,8 @@ import { AnalyticsService, TimeRange as AnalyticsTimeRange } from '../../service
 import { CopilotUsageEvent, DateRange } from '../../types/usage-events';
 import { FiltersViewModel } from './components/filters/FiltersViewModel';
 import { KpiChipsViewModel } from './components/kpis/KpiChipsViewModel';
+import { AgentsListViewModel } from './components/agents/AgentsListViewModel';
+import { ModelsListViewModel } from './components/models/ModelsListViewModel';
 
 import { ILogger } from '../../types/logger';
 import {
@@ -37,6 +39,8 @@ export class CopilotUsageHistoryModel {
 	// New component view-models (component architecture)
 	public filtersViewModel!: FiltersViewModel;
 	public kpiChipsViewModel!: KpiChipsViewModel;
+	public agentsListViewModel!: AgentsListViewModel;
+	public modelsListViewModel!: ModelsListViewModel;
 
 	constructor(
 		private readonly extensionContext: vscode.ExtensionContext,
@@ -172,6 +176,8 @@ export class CopilotUsageHistoryModel {
 		try {
 			this.filtersViewModel = new FiltersViewModel(this, this.logger);
 			this.kpiChipsViewModel = new KpiChipsViewModel(this, this.analyticsService, this.logger);
+			this.agentsListViewModel = new AgentsListViewModel(this, this.analyticsService, this.logger);
+			this.modelsListViewModel = new ModelsListViewModel(this, this.analyticsService, this.logger);
 			this.logger.trace('Initialized FiltersViewModel');
 		} catch (error) {
 			this.logger.error('Failed to initialize component view-models', error);
@@ -325,6 +331,11 @@ export class CopilotUsageHistoryModel {
 		// KPIs (simple load)
 		const kpis = this.analyticsService.getKpis(filter);
 		this.kpiChipsViewModel?.applyKpis(kpis);
+		// Agents (simple load)
+		const agents = this.analyticsService.getAgents(filter, 25);
+		this.agentsListViewModel?.applyAgents(agents);
+		// Models (simple load)
+		this.modelsListViewModel?.applyModels(models);
 
 		this.logger.info(`[DEBUG] processSessionEvents: timeSeries.length = ${timeSeries.length}`);
 		this.logger.info(`[DEBUG] processSessionEvents: languages.length = ${languages.length}`);
