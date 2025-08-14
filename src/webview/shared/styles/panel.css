@@ -46,11 +46,13 @@ th {
     font-weight: 600;
     color: var(--vscode-sideBarTitle-foreground);
     border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border);
+    vertical-align: top;
 }
 
 td {
     padding: 2px 8px 2px 0;
     color: var(--vscode-sideBar-foreground);
+    vertical-align: top;
 }
 
 td.count {
