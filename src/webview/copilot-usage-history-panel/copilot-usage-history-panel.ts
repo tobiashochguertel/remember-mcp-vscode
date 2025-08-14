@@ -90,21 +90,28 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 	/**
 	 * Handle messages from the webview
 	 */
-	private async handleMessage(message: { type: string; [key: string]: any }): Promise<void> {
+	private async handleMessage(message: { type?: string; command?: string; [key: string]: any }): Promise<void> {
 		if (!this._model) {
 			this.logger.warn('Model not available for message handling');
 			return;
 		}
 
-		this.logger.info(`Received message: ${message.type}`);
+		const msgType = message.type || message.command; // support either field
+		this.logger.info(`Received message: ${msgType}`);
 
 		try {
-			switch (message.type) {
+			switch (msgType) {
 				case 'refresh':
 					await this.handleRefresh();
 					break;
 				case 'updateTimeRange':
 					await this.handleUpdateTimeRange(message.timeRange);
+					break;
+				case 'applyFilter':
+					// For now only process timeRange if present
+					if (message.timeRange) {
+						await this.handleUpdateTimeRange(message.timeRange);
+					}
 					break;
 				case 'scanChatSessions':
 					await this.scanChatSessions();
@@ -116,11 +123,11 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 					await this.handleShowMore(message.table);
 					break;
 				default:
-					this.logger.warn(`Unknown message type: ${message.type}`);
+					this.logger.warn(`Unknown message type: ${msgType}`);
 			}
 		} catch (error) {
-			this.logger.error(`Error handling message ${message.type}:`, error);
-			vscode.window.showErrorMessage(`Failed to ${message.type}: ${error}`);
+			this.logger.error(`Error handling message ${msgType}:`, error);
+			vscode.window.showErrorMessage(`Failed to ${msgType}: ${error}`);
 		}
 	}
 
@@ -142,11 +149,20 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 	/**
 	 * Handle time range update
 	 */
-	private async handleUpdateTimeRange(timeRange: '7d' | '30d' | '90d'): Promise<void> {
+	private async handleUpdateTimeRange(timeRange: 'today' | '7d' | '30d' | '90d' | 'all'): Promise<void> {
 		if (!this._model) {return;}
 
 		try {
-			await this._model.updateTimeRange(timeRange);
+			// model currently only supports subset; map unsupported to closest
+			let mapped: '7d' | '30d' | '90d';
+			if (timeRange === 'today') {
+				mapped = '7d';
+			} else if (timeRange === 'all') {
+				mapped = '90d'; // temporary until model supports 'all'
+			} else {
+				mapped = timeRange;
+			}
+			await this._model.updateTimeRange(mapped);
 			this.logger.info(`Time range updated to ${timeRange}`);
 		} catch (error) {
 			this.logger.error('Error updating time range:', error);

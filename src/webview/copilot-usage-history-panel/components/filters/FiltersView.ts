@@ -71,7 +71,13 @@ export class FiltersView implements ComponentView<FiltersState, FiltersActions> 
 						modelIds: modelVal ? [modelVal] : [],
 					};
 				};
-				$('flt_time')?.addEventListener('change', () => sendMessage('applyFilter', patch()));
+				$('flt_time')?.addEventListener('change', () => {
+					const p = patch();
+					// Send a specific updateTimeRange message understood by extension
+					sendMessage('updateTimeRange', { timeRange: p.timeRange });
+					// Also send generic applyFilter for future use
+					sendMessage('applyFilter', p);
+				});
 				$('flt_ws')?.addEventListener('change', () => sendMessage('applyFilter', patch()));
 				$('flt_agent')?.addEventListener('change', () => sendMessage('applyFilter', patch()));
 				$('flt_model')?.addEventListener('change', () => sendMessage('applyFilter', patch()));
