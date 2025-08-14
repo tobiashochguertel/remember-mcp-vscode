@@ -74,18 +74,6 @@
         "icon": "$(clear-all)"
       },
       {
-        "command": "remember-mcp.debugLogContent",
-        "title": "Debug Log Content",
-        "category": "Remember MCP",
-        "icon": "$(debug)"
-      },
-      {
-        "command": "remember-mcp.compareRecentRequestCounts",
-        "title": "Compare Recent Request Counts",
-        "category": "Remember MCP",
-        "icon": "$(history)"
-      },
-      {
         "command": "remember-mcp.showUsageHistory",
         "title": "Show Copilot Usage History",
         "category": "Copilot Usage History",
@@ -98,18 +86,12 @@
         "icon": "$(trash)"
       },
       {
-        "command": "remember-mcp.scanChatSessions",
-        "title": "Scan Chat Sessions",
-        "category": "Copilot Usage History",
-        "icon": "$(search)"
-      },
-      {
         "command": "remember-mcp.exportUsageData",
         "title": "Export Usage Data",
         "category": "Copilot Usage History",
         "icon": "$(export)"
-      }
-      ,{
+      },
+      {
         "command": "remember-mcp.scanEditStates",
         "title": "Scan Edit State Timelines",
         "category": "Copilot Usage History",

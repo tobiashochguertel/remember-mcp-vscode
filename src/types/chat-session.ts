@@ -13,6 +13,8 @@ export interface CopilotChatSession {
 	initialLocation: string;
 	isImported?: boolean;
 	requests: CopilotChatRequest[];
+	// Optional: sequence of edit state requestIds (if edit state timelines scanned & matched by sessionId)
+	editStateRequestIds?: string[];
 }
 
 export interface CopilotChatRequest {

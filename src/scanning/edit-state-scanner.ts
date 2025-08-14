@@ -8,7 +8,7 @@ import { ForceFileWatcher } from '../util/force-file-watcher';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import { EditStateFile, EditStateScanResult, EditStateScanStats, EditStateWatcherOptions, EDIT_STATE_SCAN_CONSTANTS } from '../types/edit-state';
+import { EditStateFile, EditStateScanResult, EditStateScanStats, EditStateWatcherOptions, EDIT_STATE_SCAN_CONSTANTS, EditStateSessionRequests } from '../types/edit-state';
 import { ILogger } from '../types/logger';
 
 export class EditStateScanner {
@@ -96,69 +96,59 @@ export class EditStateScanner {
 
 	/** Parse a single edit state file */
 	async parseEditStateFile(filePath: string): Promise<EditStateScanResult | null> {
+		// Simplified optimistic parser: assume structure; fail fast on JSON error only.
 		try {
 			const stats = await fs.stat(filePath);
-			const content = await fs.readFile(filePath, 'utf-8');
-			const state: EditStateFile = JSON.parse(content);
-			if (!this.isValidEditState(state)) {
-				this.logger.error(`Invalid edit state structure in ${filePath}`);
-				return null;
+			const state: EditStateFile = JSON.parse(await fs.readFile(filePath, 'utf-8'));
+			// Minimal shape assumption – linearHistory array; if not, treat as empty without rejecting file.
+			if (!Array.isArray((state as any).linearHistory)) {
+				(state as any).linearHistory = [];
 			}
-			const result: EditStateScanResult = {
-				stateFilePath: filePath,
-				state,
-				lastModified: stats.mtime,
-				fileSize: stats.size
-			};
-			this.logger.debug(`Created EditStateScanResult for ${filePath}`);
-			return result;
-		} catch (error) {
-			this.logger.error(`Error parsing edit state file ${filePath}: ${error}`);
+			return { stateFilePath: filePath, state, lastModified: stats.mtime, fileSize: stats.size };
+		} catch (err) {
+			this.logger.error(`EditState parse fail ${filePath}: ${err}`);
 			return null;
 		}
 	}
 
-	/** Scan all editing state files */
-	async scanAllEditStates(): Promise<{ results: EditStateScanResult[]; stats: EditStateScanStats }> {
-		const startTime = Date.now();
-		this.logger.info('Starting full edit state scan...');
-		const allFiles = await this.findAllEditStateFiles();
+	/** Scan all editing state files and also produce raw requestId sequences per session (duplicates kept). */
+	async scanAllEditStates(): Promise<{ results: EditStateScanResult[]; stats: EditStateScanStats; sessionRequests: EditStateSessionRequests[] }> {
+		const started = Date.now();
+		const files = await this.findAllEditStateFiles();
 		const results: EditStateScanResult[] = [];
-		let errorFiles = 0;
-		let totalTurns = 0;
-		// Placeholder oldest/newest until we model timestamps (may derive from linearHistory later)
-		let oldestSession: string | undefined;
-		let newestSession: string | undefined;
-		const batchSize = 50;
-		for (let i = 0; i < allFiles.length; i += batchSize) {
-			const batch = allFiles.slice(i, i + batchSize);
-			const batchPromises = batch.map(async (filePath) => {
-				const result = await this.parseEditStateFile(filePath);
-				if (result) {
-					if (Array.isArray(result.state.linearHistory)) {
-						totalTurns += result.state.linearHistory.length;
-					}
-					return result;
-				} else {
-					errorFiles++;
-					return null;
+		const sessionRequests: EditStateSessionRequests[] = [];
+		// Minimal metrics only
+		let errorFiles = 0, totalTurns = 0;
+		let oldestSession: string | undefined, newestSession: string | undefined; // preserved for compatibility (unused)
+		for (const f of files) {
+			const parsed = await this.parseEditStateFile(f);
+			if (!parsed) { errorFiles++; continue; }
+			results.push(parsed);
+			const history: any[] = (parsed.state as any).linearHistory as any[];
+			totalTurns += history.length;
+			// Extract requestIds in order, preserving duplicates
+			const reqIds: string[] = [];
+			for (const turn of history) {
+				if (turn && typeof turn === 'object') {
+					const rid = (turn as any).requestId || (turn as any).telemetryInfo?.requestId;
+					if (typeof rid === 'string') { reqIds.push(rid); }
 				}
-			});
-			const batchResults = await Promise.all(batchPromises);
-			results.push(...batchResults.filter(r => r !== null) as EditStateScanResult[]);
+			}
+			sessionRequests.push({ sessionId: parsed.state.sessionId, requests: reqIds });
+			// Detailed per-turn telemetry/model statistics intentionally removed.
 		}
-		const scanDuration = Date.now() - startTime;
+		const scanDuration = Date.now() - started;
 		const stats: EditStateScanStats = {
 			totalStateFiles: results.length,
 			totalTurns,
-			scannedFiles: allFiles.length,
+			scannedFiles: files.length,
 			errorFiles,
 			scanDuration,
 			oldestSession,
 			newestSession
 		};
-		this.logger.info(`Edit state scan complete: ${results.length} state files, ${totalTurns} turns in ${scanDuration}ms`);
-		return { results, stats };
+		this.logger.info(`Edit state scan: ${results.length} files, ${totalTurns} turns in ${scanDuration}ms`);
+		return { results, stats, sessionRequests };
 	}
 
 	/** Start watching for new/modified edit state files */
@@ -218,26 +208,6 @@ export class EditStateScanner {
 		this.fileWatcher.onDidCreate(handleFileChange);
 		this.fileWatcher.onDidChange(handleFileChange);
 		this.fileWatcher.start();
-	}
-
-	/** Simple structural validation – permissive */
-	private isValidEditState(obj: any): obj is EditStateFile {
-		if (!obj) {
-			return false;
-		}
-		if (typeof obj.version !== 'number') {
-			this.logger.trace(`Invalid version: ${typeof obj.version}`);
-			return false;
-		}
-		if (typeof obj.sessionId !== 'string') {
-			this.logger.trace(`Invalid sessionId: ${typeof obj.sessionId}`);
-			return false;
-		}
-		if (!Array.isArray(obj.linearHistory)) {
-			this.logger.trace(`Invalid linearHistory: ${typeof obj.linearHistory}`);
-			return false;
-		}
-		return true;
 	}
 
 	getWatcherStatus(): { isWatching: boolean; callbackCount: number } {

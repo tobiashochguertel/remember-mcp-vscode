@@ -21,11 +21,19 @@ export interface EditStateScanResult {
 export interface EditStateScanStats {
 	totalStateFiles: number;
 	totalTurns: number;            // Sum of linearHistory length across files (approx turns)
+	// Detailed telemetry/model correlation metrics intentionally removed for simplification.
 	scannedFiles: number;          // Number of candidate files looked at
 	errorFiles: number;            // Files that failed to parse/validate
 	scanDuration: number;          // ms
-	oldestSession?: string;        // ISO date of oldest (by heuristic – none yet, placeholder)
-	newestSession?: string;        // ISO date of newest
+	oldestSession?: string;        // placeholders kept for potential future model enrichment
+	newestSession?: string;        // placeholders kept for potential future model enrichment
+}
+
+// Extremely simple per-session requestId sequence extracted from linearHistory.
+// Duplicates are intentionally preserved (we do not enforce uniqueness).
+export interface EditStateSessionRequests {
+	sessionId: string;
+	requests: string[]; // sequence of requestIds as encountered in linearHistory
 }
 
 export interface EditStateWatcherOptions {

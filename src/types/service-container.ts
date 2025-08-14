@@ -110,13 +110,17 @@ export class ServiceContainer {
 			);
 			
 			// Create unified service with injected dependencies
+			// Lazily create edit state scanner but do not force scan here
+			const editStateScanner = this.getEditStateScanner();
+
 			this._unifiedSessionDataService = new UnifiedSessionDataService(
 				sessionScanner,
 				logScanner,
 				sessionTransformer,
 				this.logger,
 				this.extensionVersion,
-				this.sessionDataServiceOptions
+				this.sessionDataServiceOptions,
+				editStateScanner
 			);
 		}
 		return this._unifiedSessionDataService;

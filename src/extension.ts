@@ -586,55 +586,7 @@ export function activate(context: vscode.ExtensionContext) {
 		}, 2000); // Delay to ensure VS Code is fully loaded
 	}
 
-	// Add debug command to inspect session content using only the unified layer
-	const debugLogCommand = vscode.commands.registerCommand('remember-mcp.debugLogContent', async () => {
-		// const outputChannel = rememberManager['outputChannel'] as vscode.LogOutputChannel;
-        
-		try {
-			// Use the shared service instance from the container
-			const sessionService = ServiceContainer.getInstance().getUnifiedSessionDataService();
-            
-			const { sessionEvents, logEntries, stats } = await sessionService.initialize();
-			logger.info(`Found ${sessionEvents.length} session events and ${logEntries.length} log entries from ${stats.totalSessions} sessions.`);
-            
-			if (sessionEvents.length > 0) {
-				logger.info('Sample session events:');
-				sessionEvents.slice(0, 5).forEach((event: any, index: number) => {
-					logger.info(`  ${index + 1}: ${event.type} at ${event.timestamp} (${event.model || 'unknown model'})`);
-				});
-			} else {
-				logger.info('No session events found.');
-			}
-            
-			if (logEntries.length > 0) {
-				logger.info('Sample log entries:');
-				logEntries.slice(0, 3).forEach((entry: any, index: number) => {
-					logger.info(`  ${index + 1}: ${entry.status} at ${entry.timestamp} (${entry.modelName})`);
-				});
-			} else {
-				logger.info('No log entries found.');
-			}
-		} catch (error) {
-			logger.error(`Session debugging failed: ${error}`);
-		}
-		// Note: No need to dispose shared service instance
-	});
-
-	// Add to subscriptions
-	context.subscriptions.push(debugLogCommand);
-
-	// Command: report recent daily comparison of session vs log counts (last 3 days)
-	const compareRecentCommand = vscode.commands.registerCommand('remember-mcp.compareRecentRequestCounts', async () => {
-		try {
-			const unified = ServiceContainer.getInstance().getUnifiedSessionDataService();
-			await unified.loadHistoricalLogs(false);
-			await unified.logRecentDailyComparison(3);
-			vscode.window.showInformationMessage('Recent request count comparison logged to output');
-		} catch (err) {
-			logger.error(`Comparison command failed: ${err}`);
-		}
-	});
-	context.subscriptions.push(compareRecentCommand);
+    
     
 	// Dispose usage history panel on deactivate
 	context.subscriptions.push({
