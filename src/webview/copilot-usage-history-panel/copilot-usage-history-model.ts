@@ -27,6 +27,71 @@ export class CopilotUsageHistoryModel {
 	private _sessionEventsCallback?: (events: CopilotUsageEvent[]) => void;
 	private _logEntriesCallback?: (logEntries: any[]) => void;
 
+	// Global filter state (authoritative in-memory runtime filters)
+	private _filters: GlobalFilters = {
+		timeRange: '30d',
+		workspace: 'all',
+		agents: [],
+		models: []
+	};
+	private _filterListeners: Array<(f: GlobalFilters) => void> = [];
+
+	/**
+	 * Get current global filters (immutable copy)
+	 */
+	public getFilters(): GlobalFilters {
+		return { ...this._filters, agents: [...this._filters.agents], models: [...this._filters.models] };
+	}
+
+	/**
+	 * Subscribe to global filter changes
+	 */
+	public onFiltersChanged(listener: (f: GlobalFilters) => void): void {
+		this._filterListeners.push(listener);
+	}
+
+	private _emitFilters(): void {
+		for (const l of this._filterListeners) {
+			try { l(this.getFilters()); } catch (e) { this.logger.error('Filter listener error', e); }
+		}
+	}
+
+	/**
+	 * Update filters (authoritative runtime state). Handles mapping of 'all' timeRange internally
+	 */
+	public async updateFilters(patch: Partial<GlobalFilters>): Promise<void> {
+		const prev = this._filters;
+		const next: GlobalFilters = {
+			...prev,
+			...patch,
+			agents: patch.agents ? [...patch.agents] : prev.agents,
+			models: patch.models ? [...patch.models] : prev.models
+		};
+		const changed = JSON.stringify(prev) !== JSON.stringify(next);
+		if (!changed) { return; }
+		// Compute per-field diff for diagnostic logging (avoid expensive deep diff later)
+		const diff: Record<string, { from: any; to: any }> = {};
+		for (const k of ['timeRange','workspace']) {
+			if ((prev as any)[k] !== (next as any)[k]) { diff[k] = { from: (prev as any)[k], to: (next as any)[k] }; }
+		}
+		if (prev.agents.join('|') !== next.agents.join('|')) { diff.agents = { from: prev.agents, to: next.agents }; }
+		if (prev.models.join('|') !== next.models.join('|')) { diff.models = { from: prev.models, to: next.models }; }
+		this.logger.debug?.('[Filters] updateFilters', { diff });
+		this._filters = next;
+		this._emitFilters();
+		// For now only timeRange drives data reloads
+		if (patch.timeRange) {
+			// Map 'all' to '90d' temporarily for analytics/settings until backend full support
+			const effective: Exclude<AnalyticsTimeRange,'all'> = (next.timeRange === 'all' ? '90d' : next.timeRange) as Exclude<AnalyticsTimeRange,'all'>;
+			// Persist only supported enumerated range (no 'all')
+			await this.updateSettings({ defaultTimeRange: effective });
+			await this.refreshAllData();
+		} else {
+			// Future: targeted refreshes for agents/models; for now do full refresh to stay correct
+			await this.refreshAllData();
+		}
+	}
+
 	// Micro-view-models
 	public summaryCards!: SummaryCardsViewModel;
 	public timeSeriesChart!: ChartViewModel;
@@ -256,10 +321,11 @@ export class CopilotUsageHistoryModel {
 		try {
 			this.globalState.isLoading = true;
 
-			// Get current settings and data
-			const settings = await this.getSettings();
-			this.logger.info(`[DEBUG] refreshAllData: settings = ${JSON.stringify(settings)}`);
-			const dateRange = this.getDateRangeForTimespan(settings.defaultTimeRange);
+			// Use authoritative runtime filters
+			const gf = this.getFilters();
+			this.logger.info(`[DEBUG] refreshAllData: filters = ${JSON.stringify(gf)}`);
+			const effectiveRange = (gf.timeRange === 'all' ? '90d' : gf.timeRange) as AnalyticsTimeRange;
+			const dateRange = this.getDateRangeForTimespan(effectiveRange);
 			const allEvents = await this.unifiedService.getSessionEvents();
 			
 			// DEBUG: Log the data flow
@@ -270,8 +336,7 @@ export class CopilotUsageHistoryModel {
 			this.analyticsService.ingest(allEvents, { replace: true });
 			
 			// DEBUG: Verify analytics service state after ingest
-			const timeRange = settings.defaultTimeRange as AnalyticsTimeRange;
-			const filter = { timeRange } as const;
+			const filter = { timeRange: effectiveRange } as const;
 			const testTimeSeries = this.analyticsService.getTimeSeries(filter);
 			this.logger.info(`[DEBUG] refreshAllData: analytics timeSeries length after ingest = ${testTimeSeries.length}`);
 			
@@ -316,16 +381,15 @@ export class CopilotUsageHistoryModel {
 	private async processSessionEvents(events: CopilotUsageEvent[]): Promise<void> {
 		console.log('Model.processSessionEvents: Processing', events.length, 'events');
 		this.logger.info(`[DEBUG] processSessionEvents: events.length = ${events.length}`);
-		
+
 		// Get settings directly instead of relying on filter controls that might be stale
-		const settings = await this.getSettings();
-		const timeRange = settings.defaultTimeRange as AnalyticsTimeRange;
-		const filter = { timeRange } as const;
+		const gf = this.getFilters();
+		const effective = (gf.timeRange === 'all' ? '90d' : gf.timeRange) as AnalyticsTimeRange;
+		const filter = { timeRange: effective } as const;
 		
 		const fvTimeRange = this.filtersViewModel?.getState().timeRange;
 		this.logger.info(`[DEBUG] processSessionEvents: FiltersViewModel.timeRange = ${fvTimeRange}`);
-		this.logger.info(`[DEBUG] processSessionEvents: settings.defaultTimeRange = ${settings.defaultTimeRange}`);
-		this.logger.info(`[DEBUG] processSessionEvents: timeRange variable = ${timeRange}`);
+		this.logger.info(`[DEBUG] processSessionEvents: effective.timeRange = ${effective}`);
 		this.logger.info(`[DEBUG] processSessionEvents: filter = ${JSON.stringify(filter)}`);
 		
 		const timeSeries = this.analyticsService.getTimeSeries(filter);
@@ -664,10 +728,13 @@ export class CopilotUsageHistoryModel {
 
 		// Calculate date range based on timespan
 		switch (timespan) {
-			case 'today':
-				// Start of today (00:00:00)
-				start = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+			case 'today': {
+				// Start of today (00:00:00 UTC)
+				const now = new Date();
+				start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+				end.setUTCHours(23, 59, 59, 999); // End of today UTC
 				break;
+			}
 			case '7d':
 				start.setDate(end.getDate() - 7);
 				break;
@@ -729,15 +796,16 @@ export class CopilotUsageHistoryModel {
 	 * Export usage data
 	 */
 	public async getExportData(): Promise<any> {
-		const settings = await this.getSettings();
-		const dateRange = this.getDateRangeForTimespan(settings.defaultTimeRange);
+		const gf = this.getFilters();
+		const effective = (gf.timeRange === 'all' ? '90d' : gf.timeRange) as AnalyticsTimeRange;
+		const dateRange = this.getDateRangeForTimespan(effective);
 		const allEvents = await this.unifiedService.getSessionEvents();
 		const events = allEvents.filter(e => {
 			const t = new Date(e.timestamp);
 			return t >= dateRange.start && t <= dateRange.end;
 		});
-		const timeRange = settings.defaultTimeRange as AnalyticsTimeRange;
-		const filter = { timeRange } as const;
+		const filter = { timeRange: effective } as const;
+		this.logger.debug?.('[Export] Using filters for export', { filters: gf, effective });
 		return {
 			metadata: {
 				exportedAt: new Date().toISOString(),
@@ -871,13 +939,13 @@ export class CopilotUsageHistoryModel {
 	}
 
 	// ---------- New helpers using AnalyticsService / Unified data ----------
-	private async getSettings(): Promise<{ defaultTimeRange: 'today' | '7d' | '30d' | '90d' }> {
+	private async getSettings(): Promise<{ defaultTimeRange: 'today' | '7d' | '30d' | '90d' }> { // TODO(persistence-v1): Extend to full GlobalFilters snapshot with versioning
 		const key = 'copilot-usage-history-settings';
 		const stored = this.extensionContext.globalState.get<{ defaultTimeRange: 'today' | '7d' | '30d' | '90d' }>(key);
 		return stored || { defaultTimeRange: '30d' };
 	}
 
-	private async updateSettings(update: Partial<{ defaultTimeRange: 'today' | '7d' | '30d' | '90d' }>): Promise<void> {
+	private async updateSettings(update: Partial<{ defaultTimeRange: 'today' | '7d' | '30d' | '90d' }>): Promise<void> { // TODO(persistence-v1): Replace with unified saveFilters() (debounced) once full filter persistence added
 		const key = 'copilot-usage-history-settings';
 		const current = await this.getSettings();
 		await this.extensionContext.globalState.update(key, { ...current, ...update });
@@ -974,3 +1042,11 @@ export class CopilotUsageHistoryModel {
 		}
 	}
 }
+
+// Global filters type (runtime authoritative state)
+export type GlobalFilters = {
+	timeRange: 'today' | '7d' | '30d' | '90d' | 'all';
+	workspace: string; // 'all' or specific workspace identifier
+	agents: string[]; // empty => all
+	models: string[]; // empty => all
+};

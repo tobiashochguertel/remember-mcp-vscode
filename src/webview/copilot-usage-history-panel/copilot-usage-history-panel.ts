@@ -105,13 +105,10 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 					await this.handleRefresh();
 					break;
 				case 'updateTimeRange':
-					await this.handleUpdateTimeRange(message.timeRange);
+					await this.updateFiltersFromMessage({ timeRange: message.timeRange });
 					break;
 				case 'applyFilter':
-					// For now only process timeRange if present
-					if (message.timeRange) {
-						await this.handleUpdateTimeRange(message.timeRange);
-					}
+					await this.updateFiltersFromMessage(message);
 					break;
 				case 'scanChatSessions':
 					await this.scanChatSessions();
@@ -163,6 +160,26 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 		} catch (error) {
 			this.logger.error('Error updating time range:', error);
 			vscode.window.showErrorMessage('Failed to update time range.');
+		}
+	}
+
+	/**
+	 * New unified filter update pathway (runtime global filters)
+	 */
+	private async updateFiltersFromMessage(msg: any): Promise<void> {
+		if (!this._model) { return; }
+		const patch: any = {};
+		if (msg.timeRange) { patch.timeRange = msg.timeRange; }
+		if (msg.workspace) { patch.workspace = msg.workspace; }
+		if (msg.agentIds) { patch.agents = msg.agentIds; }
+		if (msg.modelIds) { patch.models = msg.modelIds; }
+		if (Object.keys(patch).length === 0) { return; }
+		try {
+			await this._model.updateFilters(patch);
+			this.logger.debug?.('Applied filter patch', patch);
+		} catch (e) {
+			this.logger.error('Failed to apply filter patch', e);
+			vscode.window.showErrorMessage('Failed to apply filters');
 		}
 	}
 
