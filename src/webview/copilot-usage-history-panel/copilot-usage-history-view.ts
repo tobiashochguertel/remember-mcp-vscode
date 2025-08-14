@@ -168,8 +168,8 @@ export class CopilotUsageHistoryView {
 	 * Generate activity section using ActivityFeedView component
 	 */
 	private generateActivitySection(): string {
-		// TODO: Wire activity view model
-		return '<section class="activity"><h4>Activity</h4><div class="empty" style="color: var(--vscode-descriptionForeground);">Activity feed component will be rendered here</div></section>';
+		const vmState = this._model.activityFeedViewModel.getState();
+		return this.activityFeedView.render({ items: vmState.items });
 	}
 
 	/**
