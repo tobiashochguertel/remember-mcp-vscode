@@ -3,7 +3,7 @@ import { CopilotUsageHistoryModel } from './copilot-usage-history-model';
 import { WebviewUtils } from '../shared/webview-utils';
 import { ILogger } from '../../types/logger';
 import { FiltersView, FiltersState } from './components/filters/FiltersView';
-import { KpiChipsView, KpiChipsState } from './components/kpis/KpiChipsView';
+import { KpiChipsView, KpiChipsRenderState } from './components/kpis/KpiChipsView';
 import { AgentsListView } from './components/agents/AgentsListView';
 import { ModelsListView } from './components/models/ModelsListView';
 import { ActivityFeedView } from './components/activity/ActivityFeedView';
@@ -121,11 +121,15 @@ export class CopilotUsageHistoryView {
 	 * Generate filters section using FiltersView component
 	 */
 	private generateFiltersSection(): string {
+		const filtersVmState = this._model.filtersViewModel.getState();
 		const filtersState: FiltersState = {
-			timeRange: this._model.filterControls.timeRange.current,
-			workspace: 'all'
+			timeRange: filtersVmState.timeRange,
+			workspace: 'all',
+			agentOptions: filtersVmState.agentOptions,
+			modelOptions: filtersVmState.modelOptions,
+			agentId: undefined,
+			modelId: undefined
 		};
-
 		return this.filtersView.render(filtersState);
 	}
 
@@ -133,21 +137,15 @@ export class CopilotUsageHistoryView {
 	 * Generate KPI section using KpiChipsView component
 	 */
 	private generateKpiSection(): string {
-		// Get KPI data from analytics service
-		const kpiState: KpiChipsState = {
-			requests: 7, // Default for now - we'll hook this up properly
-			sessions: 1,
-			files: 1,
-			edits: 7,
-			latencyMsMedian: 0,
-			editRatio: 1.0,
-			models: 1,
-			agents: 1
+		const vm = this._model.kpiChipsViewModel;
+		const vmState = vm.getState();
+		const renderState: KpiChipsRenderState = {
+			chips: vmState.chips.map(c => ({ label: c.label, value: c.value })),
+			isLoading: vmState.isLoading
 		};
-
 		return `
 			<h2>Key Metrics</h2>
-			${this.kpiChipsView.render(kpiState)}
+			${this.kpiChipsView.render(renderState)}
 		`;
 	}
 

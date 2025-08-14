@@ -1,7 +1,7 @@
 import { ComponentView } from '../shared/ComponentBase';
 
 export interface FiltersState {
-	timeRange: 'today' | '7d' | '30d' | '90d' | 'all';
+	timeRange: 'today' | '7d' | '30d' | '90d';
 	workspace: 'current' | 'all';
 	agentId?: string;
 	modelId?: string;
@@ -37,22 +37,22 @@ export class FiltersView implements ComponentView<FiltersState, FiltersActions> 
 		const modelOptions = (state.modelOptions || []).map((id: string) => `<option value="${id}" ${id===state.modelId?'selected':''}>${id}</option>`).join('');
 
 		return `
-			<div style="margin-bottom: 12px;">
-				<select id="flt_time">
+			<div class="filters" id="filters_bar">
+				<select id="flt_time" class="vscode-select">
 					${timeOptions.map(o => `<option value=\"${o.v}\" ${o.v===state.timeRange?'selected':''}>${o.l}</option>`).join('')}
 				</select>
-				<select id="flt_ws">
+				<select id="flt_ws" class="vscode-select">
 					${wsOptions.map(o => `<option value=\"${o.v}\" ${o.v===state.workspace?'selected':''}>${o.l}</option>`).join('')}
 				</select>
-				<select id="flt_agent">
+				<select id="flt_agent" class="vscode-select">
 					<option value="">Agent</option>
 					${agentOptions}
 				</select>
-				<select id="flt_model">
+				<select id="flt_model" class="vscode-select">
 					<option value="">Model</option>
 					${modelOptions}
 				</select>
-				<button id="flt_refresh">Refresh</button>
+				<button id="flt_refresh" class="vscode-button">Refresh</button>
 			</div>
 		`;
 	}
@@ -71,13 +71,7 @@ export class FiltersView implements ComponentView<FiltersState, FiltersActions> 
 						modelIds: modelVal ? [modelVal] : [],
 					};
 				};
-				$('flt_time')?.addEventListener('change', () => {
-					const p = patch();
-					// Send a specific updateTimeRange message understood by extension
-					sendMessage('updateTimeRange', { timeRange: p.timeRange });
-					// Also send generic applyFilter for future use
-					sendMessage('applyFilter', p);
-				});
+				$('flt_time')?.addEventListener('change', () => sendMessage('applyFilter', patch()));
 				$('flt_ws')?.addEventListener('change', () => sendMessage('applyFilter', patch()));
 				$('flt_agent')?.addEventListener('change', () => sendMessage('applyFilter', patch()));
 				$('flt_model')?.addEventListener('change', () => sendMessage('applyFilter', patch()));

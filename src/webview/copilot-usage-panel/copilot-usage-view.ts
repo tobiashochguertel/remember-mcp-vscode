@@ -41,11 +41,6 @@ export class CopilotUsageView {
 		const tableRows = this.generateTableRows();
 		const sharedStyles = await WebviewUtils.getSharedStyles(this._extensionUri);
 
-		// Get Chart.js URI from media/chart.umd.js
-		const chartJsUri = this._webview.asWebviewUri(
-			vscode.Uri.joinPath(this._extensionUri, 'media', 'chart.umd.js')
-		);
-
 		return `<!DOCTYPE html>
         <html lang="en">
         <head>
@@ -101,8 +96,6 @@ export class CopilotUsageView {
                         }, 800);
                     });
                 });
-                // Chart.js is now available as window.Chart
-                // Example: window.Chart (add chart rendering here as needed)
             </script>
         </body>
         </html>`;

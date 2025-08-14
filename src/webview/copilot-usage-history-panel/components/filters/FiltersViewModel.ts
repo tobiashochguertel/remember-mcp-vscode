@@ -12,13 +12,27 @@ export class FiltersViewModel implements ComponentViewModel<FiltersState, Filter
 	private listeners: Array<(s: FiltersState) => void> = [];
 
 	constructor(private readonly model: CopilotUsageHistoryModel, private readonly logger: ILogger) {
-		// Initialize state from model
-		this.state = {
-			timeRange: model.filterControls.timeRange.current as FiltersState['timeRange'],
+		// Initialize state from model settings (legacy filterControls removed)
+		const initial: FiltersState = {
+			timeRange: '30d',
 			workspace: 'all',
 			agentOptions: [],
 			modelOptions: []
 		};
+		this.state = initial;
+
+		// Async sync with stored settings after state assignment
+		(async () => {
+			try {
+				const settings = await (model as any).getSettings();
+				if (settings?.defaultTimeRange && this.state.timeRange !== settings.defaultTimeRange) {
+					this.state = { ...this.state, timeRange: settings.defaultTimeRange };
+					this.notify();
+				}
+			} catch (e) {
+				this.logger.warn?.('FiltersViewModel settings sync failed', e);
+			}
+		})();
 	}
 
 	getState(): FiltersState {
@@ -46,7 +60,16 @@ export class FiltersViewModel implements ComponentViewModel<FiltersState, Filter
 					this.state = { ...this.state, ...event.patch };
 					this.notify();
 					if (event.patch.timeRange && event.patch.timeRange !== prev.timeRange) {
-						await this.model.updateTimeRange(event.patch.timeRange);
+						// Map unsupported values to closest supported for model
+						let mapped: '7d' | '30d' | '90d' = '30d';
+						if (event.patch.timeRange === '7d') {
+							mapped = '7d';
+						} else if (event.patch.timeRange === '90d') {
+							mapped = '90d';
+						} else if (event.patch.timeRange === 'today') {
+							mapped = '7d';
+						}
+						await this.model.updateTimeRange(mapped);
 					} else {
 						await this.model.refreshAllData();
 					}

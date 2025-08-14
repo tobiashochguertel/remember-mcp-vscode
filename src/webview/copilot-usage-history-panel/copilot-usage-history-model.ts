@@ -2,13 +2,14 @@ import * as vscode from 'vscode';
 import { UnifiedSessionDataService } from '../../services/unified-session-data-service';
 import { AnalyticsService, TimeRange as AnalyticsTimeRange } from '../../services/analytics-service';
 import { CopilotUsageEvent, DateRange } from '../../types/usage-events';
+import { FiltersViewModel } from './components/filters/FiltersViewModel';
+import { KpiChipsViewModel } from './components/kpis/KpiChipsViewModel';
 
 import { ILogger } from '../../types/logger';
 import {
 	SummaryCardsViewModel,
 	ChartViewModel,
 	AnalyticsTableViewModel,
-	FilterControlsViewModel,
 	StorageInfoViewModel,
 	DebugSectionViewModel,
 	GlobalStateViewModel
@@ -30,10 +31,12 @@ export class CopilotUsageHistoryModel {
 	public languageChart!: ChartViewModel;
 	public topLanguagesTable!: AnalyticsTableViewModel;
 	public topModelsTable!: AnalyticsTableViewModel;
-	public filterControls!: FilterControlsViewModel;
 	public storageInfo!: StorageInfoViewModel;
 	public debugSection!: DebugSectionViewModel;
 	public globalState!: GlobalStateViewModel;
+	// New component view-models (component architecture)
+	public filtersViewModel!: FiltersViewModel;
+	public kpiChipsViewModel!: KpiChipsViewModel;
 
 	constructor(
 		private readonly extensionContext: vscode.ExtensionContext,
@@ -43,6 +46,9 @@ export class CopilotUsageHistoryModel {
 	) {
 		// Initialize micro-view-models with default states
 		this.initializeMicroViewModels();
+
+		// Initialize new component-based view models
+		this.initializeComponentViewModels();
 
 		// Set up real-time data callbacks
 		this.setupDataCallbacks();
@@ -133,36 +139,7 @@ export class CopilotUsageHistoryModel {
 			}
 		};
 
-		this.filterControls = {
-			timeRange: {
-				current: 'today',
-				options: [
-					{ value: 'today', label: 'Today', selected: true },
-					{ value: '7d', label: 'Last 7 Days', selected: false },
-					{ value: '30d', label: 'Last 30 Days', selected: false },
-					{ value: '90d', label: 'Last 90 Days', selected: false },
-					{ value: 'all', label: 'All Time', selected: false }
-				]
-			},
-			dateRange: {
-				start: new Date(),
-				end: new Date(),
-				formatted: {
-					start: '',
-					end: '',
-					range: ''
-				}
-			},
-			actions: {
-				canExport: false,
-				canClear: false,
-				canRefresh: true,
-				canScan: true
-			}
-		};
-		
-		// DEBUG: Log initial filter control state
-		this.logger.info(`[DEBUG] Constructor: Initial filterControls.timeRange.current = ${this.filterControls.timeRange.current}`);
+		// (Legacy filterControls removed)
 
 		this.storageInfo = {
 			title: 'Storage Information',
@@ -186,6 +163,19 @@ export class CopilotUsageHistoryModel {
 			hasData: false,
 			isVisible: true
 		};
+	}
+
+	/**
+	 * Initialize new component-based view-models (component architecture migration)
+	 */
+	private initializeComponentViewModels(): void {
+		try {
+			this.filtersViewModel = new FiltersViewModel(this, this.logger);
+			this.kpiChipsViewModel = new KpiChipsViewModel(this, this.analyticsService, this.logger);
+			this.logger.trace('Initialized FiltersViewModel');
+		} catch (error) {
+			this.logger.error('Failed to initialize component view-models', error);
+		}
 	}
 
 	/**
@@ -285,9 +275,7 @@ export class CopilotUsageHistoryModel {
 			
 			const storageStats = await this.computeStorageStats(allEvents);
 			
-			// Update filter controls FIRST - before processSessionEvents needs them
-			this.updateFilterControls(settings, dateRange);
-			this.logger.info(`[DEBUG] refreshAllData: after updateFilterControls, timeRange.current = ${this.filterControls.timeRange.current}`);
+			// (Legacy filterControls update removed; FiltersViewModel derives state from settings)
 
 			// Process events and update all micro-view-models
 			await this.processSessionEvents(events);
@@ -325,7 +313,8 @@ export class CopilotUsageHistoryModel {
 		const timeRange = settings.defaultTimeRange as AnalyticsTimeRange;
 		const filter = { timeRange } as const;
 		
-		this.logger.info(`[DEBUG] processSessionEvents: this.filterControls.timeRange.current = ${this.filterControls.timeRange.current}`);
+		const fvTimeRange = this.filtersViewModel?.getState().timeRange;
+		this.logger.info(`[DEBUG] processSessionEvents: FiltersViewModel.timeRange = ${fvTimeRange}`);
 		this.logger.info(`[DEBUG] processSessionEvents: settings.defaultTimeRange = ${settings.defaultTimeRange}`);
 		this.logger.info(`[DEBUG] processSessionEvents: timeRange variable = ${timeRange}`);
 		this.logger.info(`[DEBUG] processSessionEvents: filter = ${JSON.stringify(filter)}`);
@@ -333,6 +322,9 @@ export class CopilotUsageHistoryModel {
 		const timeSeries = this.analyticsService.getTimeSeries(filter);
 		const languages = this.analyticsService.getLanguages(filter, 50);
 		const models = this.analyticsService.getModels(filter, 50);
+		// KPIs (simple load)
+		const kpis = this.analyticsService.getKpis(filter);
+		this.kpiChipsViewModel?.applyKpis(kpis);
 
 		this.logger.info(`[DEBUG] processSessionEvents: timeSeries.length = ${timeSeries.length}`);
 		this.logger.info(`[DEBUG] processSessionEvents: languages.length = ${languages.length}`);
@@ -400,9 +392,10 @@ export class CopilotUsageHistoryModel {
 		const hasData = analytics.timeSeriesData && analytics.timeSeriesData.length > 0;
 		console.log('Model.updateTimeSeriesChart: hasData:', hasData, 'analytics.timeSeriesData:', analytics.timeSeriesData);
 
+		const currentRange = this.filtersViewModel?.getState().timeRange;
 		this.timeSeriesChart = {
 			...this.timeSeriesChart,
-			subtitle: `Last ${this.filterControls.timeRange.current}`,
+			subtitle: currentRange ? `Last ${currentRange}` : undefined,
 			data: hasData ? this.prepareTimeSeriesChartData(analytics.timeSeriesData) : {},
 			options: this.getTimeSeriesChartOptions(),
 			isLoading: false,
@@ -493,35 +486,7 @@ export class CopilotUsageHistoryModel {
 	/**
 	 * Update filter controls micro-view-model
 	 */
-	private updateFilterControls(settings: { defaultTimeRange: '7d' | '30d' | '90d' }, dateRange: DateRange): void {
-		const current = settings.defaultTimeRange;
-
-		this.filterControls = {
-			timeRange: {
-				current,
-				options: [
-					{ value: '7d', label: 'Last 7 Days', selected: current === '7d' },
-					{ value: '30d', label: 'Last 30 Days', selected: current === '30d' },
-					{ value: '90d', label: 'Last 90 Days', selected: current === '90d' }
-				]
-			},
-			dateRange: {
-				start: dateRange.start,
-				end: dateRange.end,
-				formatted: {
-					start: dateRange.start.toLocaleDateString(),
-					end: dateRange.end.toLocaleDateString(),
-					range: `${dateRange.start.toLocaleDateString()} - ${dateRange.end.toLocaleDateString()}`
-				}
-			},
-			actions: {
-				canExport: this.globalState.hasData,
-				canClear: this.globalState.hasData,
-				canRefresh: true,
-				canScan: true
-			}
-		};
-	}
+	// (updateFilterControls removed - FiltersViewModel manages filter state)
 
 	/**
 	 * Update storage info micro-view-model
@@ -787,23 +752,14 @@ export class CopilotUsageHistoryModel {
 		};
 
 		// Update scan progress
-		this.filterControls.scanProgress = {
-			isScanning: true,
-			status: 'scanning',
-			message: 'Discovering chat session files...'
-		};
-		this.notifyListeners();
+		this.notifyListeners(); // (Legacy scan progress removed)
 
 		try {
 			const result = await this.unifiedService.scanAllData();
 			// Replace analytics events store with latest
 			this.analyticsService.ingest(result.sessionEvents, { replace: true });
 
-			this.filterControls.scanProgress = {
-				isScanning: false,
-				status: 'complete',
-				message: `Complete: ${result.sessionEvents.length} events found`
-			};
+			// (Legacy scan progress completion removed)
 
 			// Reset scanning state and refresh all data
 			this.globalState = {
@@ -814,11 +770,7 @@ export class CopilotUsageHistoryModel {
 			return { events: result.sessionEvents, stats: result.stats };
 
 		} catch (error) {
-			this.filterControls.scanProgress = {
-				isScanning: false,
-				status: 'error',
-				message: `Error: ${error}`
-			};
+			// (Legacy scan progress error removed)
 			
 			// Reset scanning state on error
 			this.globalState = {
