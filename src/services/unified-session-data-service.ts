@@ -579,12 +579,12 @@ export class UnifiedSessionDataService {
 					}
 				});
 
-				// Notify raw session result callbacks
-				this.logger.trace(`REAL-TIME  Notifying ${this.rawSessionCallbacks.length} raw session callbacks`);
+				// Notify raw session result callbacks with only the updated session (incremental)
+				this.logger.trace(`REAL-TIME  Notifying ${this.rawSessionCallbacks.length} raw session callbacks with 1 updated session`);
 				this.rawSessionCallbacks.forEach((callback, index) => {
 					try {
 						this.logger.trace(`REAL-TIME  Calling raw session callback ${index + 1}/${this.rawSessionCallbacks.length}`);
-						callback(this.cachedRawSessionResults);
+						callback([sessionResult]); // Send only the updated session, not entire cache
 					} catch (error) {
 						this.logger.error(`Raw session callback error: ${error}`);
 					}

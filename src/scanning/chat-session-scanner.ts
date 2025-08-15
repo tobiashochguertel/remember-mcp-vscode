@@ -18,7 +18,8 @@ import {
 import { ILogger } from '../types/logger';
 
 export class ChatSessionScanner {
-	private fileWatcher?: ForceFileWatcher;
+	private fileWatcher?: ForceFileWatcher; // Legacy single watcher (kept for backward compatibility)
+	private sessionWatchers: ForceFileWatcher[] = []; // Multiple watchers for multi-edition support
 	private watcherCallbacks: Array<(result: SessionScanResult) => void> = [];
 	private isWatching = false;
 	private lastUsedStoragePaths: string[] = [];
@@ -286,10 +287,21 @@ export class ChatSessionScanner {
         
 		this.watcherCallbacks = [];
         
+		// Cleanup legacy single watcher
 		if (this.fileWatcher) {
 			this.fileWatcher.dispose();
 			this.fileWatcher = undefined;
 		}
+		
+		// Cleanup all session watchers
+		for (const watcher of this.sessionWatchers) {
+			try {
+				watcher.dispose();
+			} catch (error) {
+				this.logger.error(`Error disposing session watcher: ${error}`);
+			}
+		}
+		this.sessionWatchers = [];
         
 		this.isWatching = false;
 		this.logger.info('Stopped watching for session file changes');
@@ -297,45 +309,83 @@ export class ChatSessionScanner {
 
 	/**
      * Setup file system watcher for session directories
+     * Creates multiple watchers to monitor ALL VS Code storage paths simultaneously
      */
 	private setupFileWatcher(): void {
-		// Create a pattern that matches chatSessions directories
-		const pattern = new vscode.RelativePattern(
-			vscode.workspace.workspaceFolders?.[0] || vscode.Uri.file(os.homedir()),
-			'**/chatSessions/*.json'
-		);
-        
-		this.fileWatcher = new ForceFileWatcher(
-			pattern,
-			0,    // No forced flush needed for session files
-			3000  // Heavy debouncing (3s) - sessions update in bursts, we don't need immediate response
-		);
-        
-		// Debounced handler for file changes
-		let debounceTimer: NodeJS.Timeout | undefined;
-        
-		const handleFileChange = async (uri: vscode.Uri) => {
-			if (debounceTimer) {
-				clearTimeout(debounceTimer);
-			}
-            
-			debounceTimer = setTimeout(async () => {
-				try {
-					const result = await this.parseSessionFile(uri.fsPath);
-					if (result) {
-						this.watcherCallbacks.forEach(callback => callback(result));
+		// Create multiple ForceFileWatcher instances, one for each storage path
+		// This approach mirrors the global-log-scanner's robust multi-edition monitoring
+		const watchers: ForceFileWatcher[] = [];
+		
+		for (const storagePath of this.storagePaths) {
+			try {
+				const edition = storagePath.includes('Insiders') ? 'VS Code Insiders' : 'VS Code Stable';
+				this.logger.debug(`Setting up session file watcher for ${edition}: ${storagePath}`);
+				
+				// Create pattern to watch: .../workspaceStorage/*/chatSessions/*.json
+				const pattern = new vscode.RelativePattern(
+					vscode.Uri.file(storagePath),
+					'*/chatSessions/*.json'
+				);
+				
+				const watcher = new ForceFileWatcher(
+					pattern,
+					500,    // No forced flush needed for session files
+					500  // Heavy debouncing (500ms) - sessions update in bursts
+				);
+				
+				// Debounced handler for file changes
+				let debounceTimer: NodeJS.Timeout | undefined;
+				
+				const handleFileChange = async (uri: vscode.Uri) => {
+					if (debounceTimer) {
+						clearTimeout(debounceTimer);
 					}
-				} catch (error) {
-					this.logger.error(`Error handling file change ${uri.fsPath}: ${error}`);
-				}
-			}, this.watcherOptions.debounceMs);
-		};
-        
-		this.fileWatcher.onDidCreate(handleFileChange);
-		this.fileWatcher.onDidChange(handleFileChange);
-        
-		// Start the watcher
-		this.fileWatcher.start();
+					
+					debounceTimer = setTimeout(async () => {
+						try {
+							// Verify this is a session file we care about
+							if (!uri.fsPath.includes('chatSessions') || !uri.fsPath.endsWith('.json')) {
+								this.logger.trace(`Ignoring irrelevant file change: ${uri.fsPath}`);
+								return;
+							}
+							
+							this.logger.trace(`${edition} session file change detected: ${uri.fsPath}`);
+							
+							const result = await this.parseSessionFile(uri.fsPath);
+							if (result) {
+								this.logger.debug(`File watcher parsed session change from ${edition}: ${result.session.sessionId}`);
+								this.watcherCallbacks.forEach(callback => callback(result));
+							}
+						} catch (error) {
+							this.logger.error(`Error handling ${edition} file change ${uri.fsPath}: ${error}`);
+						}
+					}, this.watcherOptions.debounceMs);
+				};
+				
+				watcher.onDidCreate(handleFileChange);
+				watcher.onDidChange(handleFileChange);
+				watcher.onDidDelete((uri) => {
+					this.logger.debug(`${edition} session file deleted: ${uri.fsPath}`);
+				});
+				
+				watcher.start();
+				watchers.push(watcher);
+				
+				this.logger.info(`Session file watcher started for ${edition}`);
+			} catch (error) {
+				this.logger.error(`Failed to create session file watcher for ${storagePath}: ${error}`);
+			}
+		}
+		
+		if (watchers.length === 0) {
+			this.logger.warn('No valid storage paths found for session file watching');
+			return;
+		}
+		
+		// Store all watchers for cleanup (need to update class to handle multiple watchers)
+		this.sessionWatchers = watchers;
+		
+		this.logger.info(`Session file watching active across ${watchers.length} VS Code edition(s)`);
 	}
 
 	/**
@@ -484,10 +534,21 @@ export class ChatSessionScanner {
 	/**
      * Get scanner statistics
      */
-	getWatcherStatus(): { isWatching: boolean; callbackCount: number } {
+	getWatcherStatus(): { 
+		isWatching: boolean; 
+		callbackCount: number; 
+		watcherCount: number;
+		monitoredEditions: string[];
+	} {
+		const monitoredEditions = this.storagePaths.map(path => 
+			path.includes('Insiders') ? 'VS Code Insiders' : 'VS Code Stable'
+		);
+		
 		return {
 			isWatching: this.isWatching,
-			callbackCount: this.watcherCallbacks.length
+			callbackCount: this.watcherCallbacks.length,
+			watcherCount: this.sessionWatchers.length,
+			monitoredEditions
 		};
 	}
 

@@ -15,7 +15,8 @@ export class CopilotUsagePanel implements vscode.WebviewViewProvider, vscode.Dis
 	private _disposables: vscode.Disposable[] = [];
 
 	constructor(
-		private readonly extensionUri: vscode.Uri
+		private readonly extensionUri: vscode.Uri,
+		private readonly context: vscode.ExtensionContext
 	) { }
 
 	/**
@@ -51,7 +52,7 @@ export class CopilotUsagePanel implements vscode.WebviewViewProvider, vscode.Dis
 		}
 
 		// Initialize model and view
-		this._model = new CopilotUsageModel(unifiedDataService, serviceContainer.getLogger());
+		this._model = new CopilotUsageModel(unifiedDataService, this.context, serviceContainer.getLogger());
 		this._view = new CopilotUsageView(webviewView.webview, this._model, this.extensionUri, serviceContainer.getLogger());
 
 		// Handle messages from the webview

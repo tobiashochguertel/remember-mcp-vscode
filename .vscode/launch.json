@@ -16,6 +16,30 @@
 				"${workspaceFolder}/dist/**/*.js"
 			],
 			// preLaunchTask removed; watcher handles builds automatically
+		},
+		{
+			"name": "Run Extension (with test workspace)",
+			"type": "extensionHost",
+			"request": "launch",
+			"args": [
+				"--extensionDevelopmentPath=${workspaceFolder}",
+				"${workspaceFolder}/temp_auto"
+			],
+			"outFiles": [
+				"${workspaceFolder}/dist/**/*.js"
+			]
+		},
+		{
+			"name": "Run Extension (with fake workspace)",
+			"type": "extensionHost",
+			"request": "launch",
+			"args": [
+				"--extensionDevelopmentPath=${workspaceFolder}",
+				"C:/Development/github/fake_workspace"
+			],
+			"outFiles": [
+				"${workspaceFolder}/dist/**/*.js"
+			]
 		}
 	]
 }

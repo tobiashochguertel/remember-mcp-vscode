@@ -439,7 +439,7 @@ export function activate(context: vscode.ExtensionContext) {
 	const rememberManager = new RememberMcpManager(context, logChannel, logger);
 
 	// Register Copilot Usage panel provider
-	const usagePanelProvider = new CopilotUsagePanel(context.extensionUri);
+	const usagePanelProvider = new CopilotUsagePanel(context.extensionUri, context);
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(CopilotUsagePanel.viewType, usagePanelProvider)
 	);
