@@ -1,14 +1,16 @@
 import { UnifiedSessionDataService } from '../../services/unified-session-data-service';
-import { LogEntry } from '../../scanning/log-types';
+import { SessionScanResult } from '../../types/chat-session';
 import { ILogger } from '../../types/logger';
 
 /**
  * Model for Copilot Usage Panel
  * Manages data and business logic, provides observable interface
+ * 
+ * NEW: Uses raw session data for accurate model usage counting based on toolCallRounds
  */
 export class CopilotUsageModel {
 	private _listeners: Array<() => void> = [];
-	private _logEventCallback: (entries: LogEntry[]) => void;
+	private _sessionResultsCallback: (results: SessionScanResult[]) => void;
 
 	// View model
 	public stats: Array<{ model: string; count: number; updated: boolean }> = [];
@@ -19,18 +21,18 @@ export class CopilotUsageModel {
 		private readonly unifiedDataService: UnifiedSessionDataService, 
 		private readonly _logger: ILogger
 	) {
-		// Set up callback for log events from unified data service
-		this._logEventCallback = (entries: LogEntry[]) => {
-			this._logger.info('Log entries updated:', entries);
+		// Set up callback for session results from unified data service
+		this._sessionResultsCallback = (results: SessionScanResult[]) => {
+			this._logger.info('Session results updated:', results.length, 'sessions');
 			try {
-				this.processLogEntries(entries);
+				this.processSessionResults(results);
 			} catch (error) {
-				this._logger.error('Error processing log entries:', error);
+				this._logger.error('Error processing session results:', error);
 			}
 		};
 
-		// Register with unified data service for real-time log updates
-		this.unifiedDataService.onLogEntriesUpdated(this._logEventCallback);
+		// Register with unified data service for real-time session updates
+		this.unifiedDataService.onRawSessionResultsUpdated(this._sessionResultsCallback);
 
 		// Initialize stats with current data
 		this.initializeStats();
@@ -41,34 +43,48 @@ export class CopilotUsageModel {
 	 */
 	private async initializeStats(): Promise<void> {
 		try {
-			const entries = await this.unifiedDataService.getLogEntries();
-			this.processLogEntries(entries);
+			const results = await this.unifiedDataService.getRawSessionResults();
+			this.processSessionResults(results);
 		} catch (error) {
 			console.error('Error initializing stats:', error);
 		}
 	}
 
 	/**
-	 * Process log entries to extract model usage statistics
-	 * Accumulates new entries with existing stats data
+	 * Process session results to extract model usage statistics
+	 * Uses toolCallRounds.length from session data for accurate request counting
 	 */
-	private processLogEntries(entries: LogEntry[]): void {
-		this._logger.info(`Processing ${entries.length} new log entries`);
+	private processSessionResults(results: SessionScanResult[]): void {
+		this._logger.info(`Processing ${results.length} session results`);
 
 		// Start with existing accumulated counts from current stats
 		const modelUsage = new Map<string, number>();
 		
-		// Initialize with current stats data
+		// Initialize with current stats data  
 		this.stats.forEach(({ model, count }) => {
 			modelUsage.set(model, count);
 		});
 
-		// Add new entries to accumulated counts
-		entries.forEach(entry => {
-			if (entry.modelName) {
-				const currentCount = modelUsage.get(entry.modelName) || 0;
-				modelUsage.set(entry.modelName, currentCount + 1);
-			}
+		// Process each session result
+		results.forEach(result => {
+			const session = result.session;
+			
+			// Process each request in the session
+			session.requests.forEach(request => {
+				// Extract model ID (with fallback for missing modelId)
+				const modelId = request.modelId || 'unknown-model';
+				
+				// Count backend requests using toolCallRounds.length
+				// According to Session Internals wiki: "The number of backend calls for a turn is always equal to toolCallRounds.length"
+				const toolCallRounds = request.result?.metadata?.toolCallRounds;
+				const requestCount = Array.isArray(toolCallRounds) ? toolCallRounds.length : 1;
+				
+				// Add to accumulated counts
+				const currentCount = modelUsage.get(modelId) || 0;
+				modelUsage.set(modelId, currentCount + requestCount);
+				
+				this._logger.trace(`Request ${request.requestId}: model=${modelId}, toolCallRounds=${requestCount}`);
+			});
 		});
 
 		const totalRequests = Array.from(modelUsage.values()).reduce((sum, count) => sum + count, 0);
@@ -111,11 +127,11 @@ export class CopilotUsageModel {
 
 	/**
 	 * Clear all usage statistics
+	 * TODO: Implement session-based clear functionality in unified data service
 	 */
 	public async clearStats(): Promise<void> {
-		// TODO: Implement clear functionality in unified data service
-		// For now, we'll need to clear the underlying data
-		console.warn('Clear stats not yet implemented for unified data service');
+		// For now, reset local stats since we don't have session-based clearing yet
+		this._logger.warn('Clear stats: Resetting local statistics only (session data unchanged)');
 
 		this.stats = [];
 		this.totalRequests = 0;
@@ -129,8 +145,8 @@ export class CopilotUsageModel {
 	 */
 	public async refreshStats(): Promise<void> {
 		try {
-			const entries = await this.unifiedDataService.getLogEntries(true); // Force refresh
-			this.processLogEntries(entries);
+			const results = await this.unifiedDataService.getRawSessionResults(true); // Force refresh
+			this.processSessionResults(results);
 		} catch (error) {
 			console.error('Error refreshing stats:', error);
 		}
@@ -148,7 +164,7 @@ export class CopilotUsageModel {
 	 */
 	public dispose(): void {
 		// Remove callback from unified data service
-		this.unifiedDataService.removeLogEventCallback(this._logEventCallback);
+		this.unifiedDataService.removeRawSessionCallback(this._sessionResultsCallback);
 
 		// Clear local listeners
 		this._listeners = [];
