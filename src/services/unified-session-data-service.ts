@@ -47,6 +47,8 @@ export class UnifiedSessionDataService {
 	private cachedLogEntries: LogEntry[] = [];
 	private lastScanStats?: SessionScanStats;
 	private historicalLogsLoaded = false;
+	// Single-flight promise to coalesce concurrent full scans (prevents double scan during startup)
+	private currentScanPromise?: Promise<{ sessionEvents: CopilotUsageEvent[]; logEntries: LogEntry[]; stats: SessionScanStats }>;
 
 	/** Indicates whether historical global logs were loaded into cache */
 	isHistoricalLogsLoaded(): boolean { return this.historicalLogsLoaded; }
@@ -307,7 +309,11 @@ export class UnifiedSessionDataService {
      * Protected against concurrent scans with mutex
      */
 	async scanAllData(): Promise<{ sessionEvents: CopilotUsageEvent[]; logEntries: LogEntry[]; stats: SessionScanStats }> {
-		return await this.scanMutex.runExclusive(async () => {
+		// If a scan is already in flight, return its promise (single-flight behavior)
+		if (this.currentScanPromise) {
+			return this.currentScanPromise;
+		}
+		this.currentScanPromise = this.scanMutex.runExclusive(async () => {
 			try {
 				// Scan session files
 				const { results, stats } = await this.sessionScanner.scanAllSessions();
@@ -351,7 +357,7 @@ export class UnifiedSessionDataService {
 						this.logger.info('Missing edit request sessions dump END');
 					}
 				}
-                
+				
 				// Transform session data to events
 				const sessionEvents: CopilotUsageEvent[] = [];
 				for (const sessionResult of results) {
@@ -359,27 +365,66 @@ export class UnifiedSessionDataService {
 					sessionEvents.push(...events);
 				}
 
+				// Edit correlation summary
+				try {
+					const editLinked = sessionEvents.filter(e => e.isInEdit).length;
+					const total = sessionEvents.length;
+					const pct = total > 0 ? ((editLinked / total) * 100).toFixed(1) : '0.0';
+					this.logger.info(`Edit correlation: ${editLinked}/${total} (${pct}%) events linked to edit state; ${total - editLinked} without edit linkage`);
 
-				
-				// Sort session events by timestamp (timestamp is already a Date)
+					// Breakdown of missing edit linkage
+					const missing = sessionEvents.filter(e => !e.isInEdit);
+					if (missing.length > 0) {
+						const countsByType = new Map<string, number>();
+						for (const ev of missing) {
+							countsByType.set(ev.type, (countsByType.get(ev.type) || 0) + 1);
+						}
+						this.logger.info(`Missing edit linkage by event type: ${[...countsByType.entries()].map(([t,c]) => `${t}:${c}`).join(', ')}`);
+						const countsByMode = new Map<string, number>();
+						for (const ev of missing) {
+							const modeKey = ev.modes && ev.modes.length > 0 ? ev.modes[0] : 'none';
+							countsByMode.set(modeKey, (countsByMode.get(modeKey) || 0) + 1);
+						}
+						this.logger.info(`Missing edit linkage by mode: ${[...countsByMode.entries()].map(([m,c]) => `${m}:${c}`).join(', ')}`);
+						if (countsByMode.has('none')) {
+							const missingModeEvents = missing.filter(ev => !ev.modes || ev.modes.length === 0);
+							const agentCounts = new Map<string, number>();
+							const sourceCounts = new Map<string, number>();
+							for (const ev of missingModeEvents) {
+								agentCounts.set(ev.agent || 'no-agent', (agentCounts.get(ev.agent || 'no-agent') || 0) + 1);
+								sourceCounts.set(ev.source, (sourceCounts.get(ev.source) || 0) + 1);
+							}
+							const sampleReqIds = missingModeEvents.map(e => e.requestId).filter(Boolean).slice(0, 8).join(', ');
+							this.logger.info(
+								`Mode diagnostics (none bucket): events=${missingModeEvents.length}; agents=${[...agentCounts.entries()].map(([a,c]) => `${a}:${c}`).join(', ')}; sources=${[...sourceCounts.entries()].map(([s,c]) => `${s}:${c}`).join(', ')}; sampleRequestIds=${sampleReqIds || 'n/a'}`
+							);
+						}
+						for (const [t] of countsByType.entries()) {
+							const sampleSessions = Array.from(new Set(missing.filter(e => e.type === t).map(e => e.sessionId))).slice(0, 5);
+							this.logger.trace(`Missing edit linkage sample sessions for type ${t}: ${sampleSessions.join(', ') || 'none'}`);
+						}
+					}
+				} catch (e) {
+					this.logger.debug(`Edit correlation summary failed: ${e}`);
+				}
+
+				// Sort session events by timestamp
 				sessionEvents.sort((a: CopilotUsageEvent, b: CopilotUsageEvent) => a.timestamp.getTime() - b.timestamp.getTime());
-
-				// No initial log scanning - we only watch log files for real-time events
 				const logEntries: LogEntry[] = [];
-                
-				// Cache the results separately
 				this.cachedSessionEvents = sessionEvents;
 				this.cachedLogEntries = logEntries;
 				this.lastScanStats = stats;
-                
 				this.logger.trace(`Scanned ${results.length} sessions, generated ${sessionEvents.length} session events and ${logEntries.length} log entries`);
-                
 				return { sessionEvents, logEntries, stats };
 			} catch (error) {
 				this.logger.error(`Scan failed: ${error}`);
 				throw error;
+			} finally {
+				// Allow new scans after current completes
+				setTimeout(() => { this.currentScanPromise = undefined; }, 0);
 			}
 		});
+		return this.currentScanPromise;
 	}
 
 	/**

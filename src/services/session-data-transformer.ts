@@ -30,6 +30,26 @@ export class SessionDataTransformer {
 		private readonly extensionVersion: string
 	) {}
 
+	// Determine source (chat vs inline vs sidebar) heuristically
+	private determineSource(session: CopilotChatSession, request: CopilotChatRequest): 'copilot-chat' | 'copilot-inline' | 'copilot-sidebar' {
+		if (Array.isArray((request as any).modes) && (request as any).modes.length > 0) {
+			const modes = (request as any).modes.map((m: string) => m.toLowerCase());
+			if (modes.includes('inline')) { return 'copilot-inline'; }
+			if (modes.includes('sidebar')) { return 'copilot-sidebar'; }
+		}
+		if (request.agent?.id) {
+			const id = request.agent.id.toLowerCase();
+			if (id.includes('inline')) { return 'copilot-inline'; }
+			if (id.includes('sidebar')) { return 'copilot-sidebar'; }
+		}
+		if (session.initialLocation) {
+			const loc = session.initialLocation.toLowerCase();
+			if (loc.includes('inline')) { return 'copilot-inline'; }
+			if (loc.includes('sidebar')) { return 'copilot-sidebar'; }
+		}
+		return 'copilot-chat';
+	}
+
 	/**
      * Transform a complete session scan result into usage events
      */
@@ -95,13 +115,41 @@ export class SessionDataTransformer {
 		// Determine event type based on context
 		const eventType = this.determineEventType(request);
         
+		// Correlate with edit state if available (session augmented earlier by UnifiedSessionDataService)
+		const editIds: string[] | undefined = (session as any).editStateRequestIds;
+		const isInEdit = !!(editIds && request.requestId && editIds.includes(request.requestId));
+        
+		const source = this.determineSource(session, request);
+
+		// Normalize / synthesize modes: if absent, infer from agent or heuristics so analytics by mode isn't dominated by 'none'
+		let normalizedModes: string[] | undefined = undefined;
+		if (Array.isArray((request as any).modes) && (request as any).modes.length > 0) {
+			// Clone to avoid accidental mutation
+			normalizedModes = [...(request as any).modes];
+		} else {
+			// Derive a synthetic mode label from agent or event type
+			const agentId = request.agent?.id?.toLowerCase() || '';
+			if (agentId.includes('editsagent') || agentId.includes('editing')) {
+				normalizedModes = ['edit'];
+			} else if (agentId.includes('explain')) {
+				normalizedModes = ['explain'];
+			} else if (agentId.includes('inline')) {
+				normalizedModes = ['inline'];
+			} else if (agentId.includes('sidebar')) {
+				normalizedModes = ['sidebar'];
+			} else {
+				// Fallback generic conversational ask
+				normalizedModes = ['ask'];
+			}
+		}
 		const event: CopilotUsageEvent = {
 			id,
-			timestamp: new Date(typeof request.timestamp === 'number' && request.timestamp < 1e12 ? request.timestamp * 1000 : request.timestamp), // Normalize seconds to ms, store as Date
+			timestamp: new Date(typeof request.timestamp === 'number' && request.timestamp < 1e12 ? request.timestamp * 1000 : request.timestamp),
 			type: eventType,
-			source: 'copilot-chat',
+			source,
 			requestId: request.requestId,
 			agent: request.agent?.id,
+			modes: normalizedModes,
             
 			// Session hierarchy
 			vscodeSessionId: sessionHierarchy.vscodeSessionId,
@@ -114,14 +162,15 @@ export class SessionDataTransformer {
 			duration: request.result?.timings?.totalElapsed,
 			tokensUsed: this.estimateTokenUsage(request),
 			model: request.modelId,
+			isInEdit,
             
 			// Context
 			filePath: this.extractMainFilePath(request),
 			userPrompt: this.shouldIncludePrompt() ? request.message.text : undefined,
             
 			// Metadata
-			vsCodeVersion: 'unknown', // Not available in session files
-			copilotVersion: 'unknown', // Not available in session files  
+			vsCodeVersion: 'unknown',
+			copilotVersion: 'unknown',
 			extensionVersion: this.extensionVersion
 		};
         

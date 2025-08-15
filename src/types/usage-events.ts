@@ -10,6 +10,8 @@ export interface CopilotUsageEvent {
 	source: 'copilot-chat' | 'copilot-inline' | 'copilot-sidebar';
 	requestId?: string;            // Original request ID within the session (for drill-in)
 	agent?: string;                // Agent identifier (e.g., editsAgent, explainAgent)
+	// Raw request modes (direct pass-through from session JSON). Keeping separate from derived source.
+	modes?: string[];              // e.g., ["ask"], ["edit"], ["inline"], etc.
     
 	// Session Information (hierarchical)
 	vscodeSessionId: string;       // VS Code process session (20250808T010909)
@@ -22,6 +24,9 @@ export interface CopilotUsageEvent {
 	duration?: number;             // Interaction duration (ms)
 	tokensUsed?: number;           // Estimated token usage
 	model?: string;                // AI model used
+    
+	// Correlation Flags
+	isInEdit?: boolean;            // True if this requestId appears in an edit state linearHistory
     
 	// Context
 	language?: string;             // Programming language

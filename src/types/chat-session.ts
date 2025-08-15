@@ -23,7 +23,10 @@ export interface CopilotChatRequest {
 	timestamp: number; // Unix timestamp
 	modelId?: string; // Optional - not all requests have a modelId
 	isCanceled: boolean;
-    
+	
+	// NEW: modes array present in newer session files (e.g., ["ask"], ["edit"], etc.)
+	modes?: string[];
+	    
 	// User message
 	message: {
 		text: string;
