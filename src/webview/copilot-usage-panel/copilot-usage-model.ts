@@ -52,38 +52,45 @@ export class CopilotUsageModel {
 
 	/**
 	 * Process session results to extract model usage statistics
-	 * Uses toolCallRounds.length from session data for accurate request counting
+	 * Uses toolCallRounds from session data for accurate backend LLM call counting
 	 */
 	private processSessionResults(results: SessionScanResult[]): void {
 		this._logger.info(`Processing ${results.length} session results`);
 
-		// Start with existing accumulated counts from current stats
+		// Reset model usage counts (don't accumulate across refreshes)
 		const modelUsage = new Map<string, number>();
-		
-		// Initialize with current stats data  
-		this.stats.forEach(({ model, count }) => {
-			modelUsage.set(model, count);
-		});
 
 		// Process each session result
 		results.forEach(result => {
 			const session = result.session;
+			const metadata = result.harvestedMetadata;
+			
+			// Log session processing with metadata
+			this._logger.trace(`Processing session ${session.sessionId} from workspace ${metadata?.workspaceId || 'unknown'} (${metadata?.vscodeVariant || 'unknown'})`);
 			
 			// Process each request in the session
 			session.requests.forEach(request => {
 				// Extract model ID (with fallback for missing modelId)
 				const modelId = request.modelId || 'unknown-model';
 				
-				// Count backend requests using toolCallRounds.length
-				// According to Session Internals wiki: "The number of backend calls for a turn is always equal to toolCallRounds.length"
+				// Process toolCallRounds for accurate backend call counting
+				// According to Session Internals wiki: "toolCallRounds represents the actual backend LLM calls"
 				const toolCallRounds = request.result?.metadata?.toolCallRounds;
-				const requestCount = Array.isArray(toolCallRounds) ? toolCallRounds.length : 1;
-				
-				// Add to accumulated counts
-				const currentCount = modelUsage.get(modelId) || 0;
-				modelUsage.set(modelId, currentCount + requestCount);
-				
-				this._logger.trace(`Request ${request.requestId}: model=${modelId}, toolCallRounds=${requestCount}`);
+				if (toolCallRounds && Array.isArray(toolCallRounds)) {
+					toolCallRounds.forEach((round, index) => {
+						// Each toolCallRound represents one backend LLM call
+						const currentCount = modelUsage.get(modelId) || 0;
+						modelUsage.set(modelId, currentCount + 1);
+						
+						this._logger.trace(`Request ${request.requestId}, Round ${index}: model=${modelId}, roundId=${round.id}`);
+					});
+				} else {
+					// Fallback: if no toolCallRounds, count as 1 request (for older session format compatibility)
+					const currentCount = modelUsage.get(modelId) || 0;
+					modelUsage.set(modelId, currentCount + 1);
+					
+					this._logger.trace(`Request ${request.requestId}: model=${modelId}, no toolCallRounds (fallback count=1)`);
+				}
 			});
 		});
 

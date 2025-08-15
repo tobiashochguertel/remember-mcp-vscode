@@ -124,6 +124,38 @@ export class ChatSessionScanner {
 	}
 
 	/**
+	 * Extract metadata from session file path that isn't available in session JSON
+	 * Path format: .../[Code|Code - Insiders]/User/workspaceStorage/[WORKSPACE_ID]/chatSessions/[SESSION_ID].json
+	 */
+	private extractHarvestedMetadata(filePath: string): SessionScanResult['harvestedMetadata'] {
+		const normalizedPath = path.normalize(filePath);
+		const sessionFileName = path.basename(filePath);
+		
+		// Extract workspace ID from path pattern
+		const workspaceStorageMatch = normalizedPath.match(/workspaceStorage[/\\]([a-f0-9]+)[/\\]chatSessions/i);
+		const workspaceId = workspaceStorageMatch ? workspaceStorageMatch[1] : 'unknown';
+		
+		// Detect VS Code variant from path
+		let vscodeVariant: 'stable' | 'insiders' | 'unknown' = 'unknown';
+		if (normalizedPath.includes('Code - Insiders')) {
+			vscodeVariant = 'insiders';
+		} else if (normalizedPath.includes('Code') && !normalizedPath.includes('Code - Insiders')) {
+			vscodeVariant = 'stable';
+		}
+		
+		// Check if path contains current user directory
+		const currentUser = os.userInfo().username;
+		const isFromLocalUser = normalizedPath.includes(currentUser);
+		
+		return {
+			workspaceId,
+			vscodeVariant,
+			sessionFileName,
+			isFromLocalUser
+		};
+	}
+
+	/**
      * Parse a single session file and return structured data
      */
 	async parseSessionFile(filePath: string): Promise<SessionScanResult | null> {
@@ -141,11 +173,12 @@ export class ChatSessionScanner {
 				return null;
 			}
             
-			const result = {
+			const result: SessionScanResult = {
 				sessionFilePath: filePath,
 				session,
 				lastModified: stats.mtime,
-				fileSize: stats.size
+				fileSize: stats.size,
+				harvestedMetadata: this.extractHarvestedMetadata(filePath)
 			};
             
 			// Log the result structure for debugging

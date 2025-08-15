@@ -144,6 +144,13 @@ export interface SessionScanResult {
 	session: CopilotChatSession;
 	lastModified: Date;
 	fileSize: number;
+	// Metadata harvested from file path (not available in session JSON)
+	harvestedMetadata: {
+		workspaceId: string;          // Extracted from workspaceStorage/[ID]/chatSessions path
+		vscodeVariant: 'stable' | 'insiders' | 'unknown';  // Detected from 'Code' vs 'Code - Insiders' in path
+		sessionFileName: string;      // Just the filename part (session-id.json)
+		isFromLocalUser: boolean;     // True if path contains current user directory
+	};
 }
 
 export interface SessionScanStats {
