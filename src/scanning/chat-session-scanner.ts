@@ -378,6 +378,71 @@ export class ChatSessionScanner {
 					return false;
 				}
 			}
+            
+			// Validate result.metadata.toolCallRounds if present (CRITICAL FOR NOT LOSING DATA)
+			if (req.result?.metadata?.toolCallRounds) {
+				if (!Array.isArray(req.result.metadata.toolCallRounds)) {
+					this.logger.trace(`Request ${i} invalid toolCallRounds: not an array`);
+					return false;
+				}
+                
+				// Validate each toolCallRound
+				for (let j = 0; j < req.result.metadata.toolCallRounds.length; j++) {
+					const round = req.result.metadata.toolCallRounds[j];
+                    
+					if (!round || typeof round !== 'object') {
+						this.logger.trace(`Request ${i} toolCallRound ${j} invalid: not an object`);
+						return false;
+					}
+                    
+					if (typeof round.id !== 'string') {
+						this.logger.trace(`Request ${i} toolCallRound ${j} invalid id: ${typeof round.id}`);
+						return false;
+					}
+                    
+					if (typeof round.response !== 'string') {
+						this.logger.trace(`Request ${i} toolCallRound ${j} invalid response: ${typeof round.response}`);
+						return false;
+					}
+                    
+					if (!Array.isArray(round.toolCalls)) {
+						this.logger.trace(`Request ${i} toolCallRound ${j} invalid toolCalls: ${typeof round.toolCalls}`);
+						return false;
+					}
+                    
+					if (typeof round.toolInputRetry !== 'number') {
+						this.logger.trace(`Request ${i} toolCallRound ${j} invalid toolInputRetry: ${typeof round.toolInputRetry}`);
+						return false;
+					}
+                    
+					// Validate each toolCall in the round
+					for (let k = 0; k < round.toolCalls.length; k++) {
+						const toolCall = round.toolCalls[k];
+                        
+						if (!toolCall || typeof toolCall !== 'object') {
+							this.logger.trace(`Request ${i} toolCallRound ${j} toolCall ${k} invalid: not an object`);
+							return false;
+						}
+                        
+						if (typeof toolCall.id !== 'string') {
+							this.logger.trace(`Request ${i} toolCallRound ${j} toolCall ${k} invalid id: ${typeof toolCall.id}`);
+							return false;
+						}
+                        
+						if (typeof toolCall.name !== 'string') {
+							this.logger.trace(`Request ${i} toolCallRound ${j} toolCall ${k} invalid name: ${typeof toolCall.name}`);
+							return false;
+						}
+                        
+						if (typeof toolCall.arguments !== 'string') {
+							this.logger.trace(`Request ${i} toolCallRound ${j} toolCall ${k} invalid arguments: ${typeof toolCall.arguments}`);
+							return false;
+						}
+					}
+				}
+                
+				this.logger.debug(`Request ${i} has ${req.result.metadata.toolCallRounds.length} toolCallRounds - data preserved`);
+			}
 		}
         
 		return true;
