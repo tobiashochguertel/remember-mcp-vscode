@@ -41,10 +41,12 @@ export class UnifiedSessionDataService {
 	// Separate callback arrays for different event types
 	private sessionEventCallbacks: Array<(events: CopilotUsageEvent[]) => void> = [];
 	private logEventCallbacks: Array<(entries: LogEntry[]) => void> = [];
+	private rawSessionCallbacks: Array<(results: SessionScanResult[]) => void> = [];
     
 	// Separate caches for different data types
 	private cachedSessionEvents: CopilotUsageEvent[] = [];
 	private cachedLogEntries: LogEntry[] = [];
+	private cachedRawSessionResults: SessionScanResult[] = [];
 	private lastScanStats?: SessionScanStats;
 	private historicalLogsLoaded = false;
 	// Single-flight promise to coalesce concurrent full scans (prevents double scan during startup)
@@ -413,6 +415,7 @@ export class UnifiedSessionDataService {
 				const logEntries: LogEntry[] = [];
 				this.cachedSessionEvents = sessionEvents;
 				this.cachedLogEntries = logEntries;
+				this.cachedRawSessionResults = results;
 				this.lastScanStats = stats;
 				this.logger.trace(`Scanned ${results.length} sessions, generated ${sessionEvents.length} session events and ${logEntries.length} log entries`);
 				return { sessionEvents, logEntries, stats };
@@ -450,6 +453,18 @@ export class UnifiedSessionDataService {
 	}
 
 	/**
+     * Get current raw session scan results (untampered session data with toolCallRounds)
+     */
+	async getRawSessionResults(forceRefresh = false): Promise<SessionScanResult[]> {
+		if (forceRefresh || this.cachedRawSessionResults.length === 0) {
+			const { results } = await this.sessionScanner.scanAllSessions();
+			this.cachedRawSessionResults = results;
+			return results;
+		}
+		return this.cachedRawSessionResults;
+	}
+
+	/**
      * Get last scan statistics
      */
 	getLastScanStats(): SessionScanStats | undefined {
@@ -474,6 +489,14 @@ export class UnifiedSessionDataService {
 	}
 
 	/**
+     * Subscribe to raw session scan result updates (untampered session data with toolCallRounds)
+     */
+	onRawSessionResultsUpdated(callback: (results: SessionScanResult[]) => void): void {
+		this.rawSessionCallbacks.push(callback);
+		this.logger.trace(`Raw session callback added - now have ${this.rawSessionCallbacks.length} callbacks`);
+	}
+
+	/**
      * Remove session event callback
      */
 	removeSessionEventCallback(callback: (events: CopilotUsageEvent[]) => void): void {
@@ -490,6 +513,16 @@ export class UnifiedSessionDataService {
 		const index = this.logEventCallbacks.indexOf(callback);
 		if (index > -1) {
 			this.logEventCallbacks.splice(index, 1);
+		}
+	}
+
+	/**
+     * Remove raw session result callback
+     */
+	removeRawSessionCallback(callback: (results: SessionScanResult[]) => void): void {
+		const index = this.rawSessionCallbacks.indexOf(callback);
+		if (index > -1) {
+			this.rawSessionCallbacks.splice(index, 1);
 		}
 	}
 
@@ -519,10 +552,20 @@ export class UnifiedSessionDataService {
 					);
 					this.cachedSessionEvents.push(...newEvents);
                     
+					// Also update cached raw session results (replace session with same sessionId)
+					const beforeRawCount = this.cachedRawSessionResults.length;
+					this.cachedRawSessionResults = this.cachedRawSessionResults.filter(
+						(result: SessionScanResult) => result.session.sessionId !== sessionResult.session.sessionId
+					);
+					this.cachedRawSessionResults.push(sessionResult);
+                    
 					// Sort by timestamp
 					this.cachedSessionEvents.sort((a: CopilotUsageEvent, b: CopilotUsageEvent) => a.timestamp.getTime() - b.timestamp.getTime());
+					this.cachedRawSessionResults.sort((a: SessionScanResult, b: SessionScanResult) => 
+						new Date(a.session.creationDate).getTime() - new Date(b.session.creationDate).getTime()
+					);
                     
-					this.logger.trace(`REAL-TIME  Cache updated from ${beforeCount} to ${this.cachedSessionEvents.length} events`);
+					this.logger.trace(`REAL-TIME  Cache updated from ${beforeCount} to ${this.cachedSessionEvents.length} events, ${beforeRawCount} to ${this.cachedRawSessionResults.length} raw sessions`);
 				});
                 
 				// Notify session event callbacks
@@ -533,6 +576,17 @@ export class UnifiedSessionDataService {
 						callback(this.cachedSessionEvents);
 					} catch (error) {
 						this.logger.error(` ${error}`);
+					}
+				});
+
+				// Notify raw session result callbacks
+				this.logger.trace(`REAL-TIME  Notifying ${this.rawSessionCallbacks.length} raw session callbacks`);
+				this.rawSessionCallbacks.forEach((callback, index) => {
+					try {
+						this.logger.trace(`REAL-TIME  Calling raw session callback ${index + 1}/${this.rawSessionCallbacks.length}`);
+						callback(this.cachedRawSessionResults);
+					} catch (error) {
+						this.logger.error(`Raw session callback error: ${error}`);
 					}
 				});
 
@@ -617,11 +671,13 @@ export class UnifiedSessionDataService {
 		isWatching: boolean; 
 		sessionCallbackCount: number; 
 		logCallbackCount: number;
+		rawSessionCallbackCount: number;
 	} {
 		return {
 			isWatching: this.isWatchingEnabled,
 			sessionCallbackCount: this.sessionEventCallbacks.length,
-			logCallbackCount: this.logEventCallbacks.length
+			logCallbackCount: this.logEventCallbacks.length,
+			rawSessionCallbackCount: this.rawSessionCallbacks.length
 		};
 	}
 
@@ -655,6 +711,7 @@ export class UnifiedSessionDataService {
 		this.stopRealTimeUpdates();
 		this.sessionEventCallbacks = [];
 		this.logEventCallbacks = [];
+		this.rawSessionCallbacks = [];
 		this.sessionScanner.dispose();
 		if (this.logScanner) {
 			this.logScanner.dispose();
