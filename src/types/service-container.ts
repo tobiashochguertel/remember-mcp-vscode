@@ -115,6 +115,10 @@ export class ServiceContainer {
 				this.extensionVersion,
 				this.sessionDataServiceOptions,
 			);
+
+			this._unifiedSessionDataService.initialize().catch(err => {
+				this.logger.error(`Unified init failed: ${err}`);
+			});
 		}
 		return this._unifiedSessionDataService;
 	}
@@ -135,7 +139,8 @@ export class ServiceContainer {
 	getAnalyticsService(): AnalyticsService {
 		if (!this._analyticsService) {
 			this.logger.info('Creating AnalyticsService instance');
-			this._analyticsService = new AnalyticsService(this.logger);
+			const unified = this.getUnifiedSessionDataService();
+			this._analyticsService = new AnalyticsService(this.logger, unified);
 		}
 		return this._analyticsService;
 	}

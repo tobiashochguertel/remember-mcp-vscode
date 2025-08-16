@@ -32,7 +32,7 @@ export class KpiChipsViewModel {
 	/** Apply raw KPI numbers from AnalyticsService */
 	applyKpis(kpis: Kpis): void {
 		const chips: KpiChip[] = [
-			{ id: 'requests', label: 'Requests', value: kpis.requests.toString() },
+			{ id: 'requests', label: 'Requests', value: kpis.turns.toString() },
 			{ id: 'sessions', label: 'Sessions', value: kpis.sessions.toString() },
 			{ id: 'files', label: 'Files', value: kpis.files.toString() },
 			{ id: 'edits', label: 'Edits', value: kpis.edits.toString() },

@@ -47,8 +47,9 @@ export class CopilotUsageHistoryView {
 	 * Generate and set the HTML content for the webview
 	 */
 	public async render(): Promise<void> {
-		if (this._model.globalState.errorMessage) {
-			this._webview.html = await this.generateErrorHtml(this._model.globalState.errorMessage);
+		const error = this._model.getErrorMessage?.();
+		if (error) {
+			this._webview.html = await this.generateErrorHtml(error);
 			await this.updateToolbarVisibility(false);
 			return;
 		}
@@ -56,7 +57,7 @@ export class CopilotUsageHistoryView {
 		const html = await this.generateHtml();
 		this._webview.html = html;
 		
-		const shouldShowToolbar = this._model.globalState.hasData;
+		const shouldShowToolbar = this._model.hasData();
 		await this.updateToolbarVisibility(shouldShowToolbar);
 	}
 
@@ -76,8 +77,8 @@ export class CopilotUsageHistoryView {
 	 * Generate complete HTML content using micro components
 	 */
 	private async generateHtml(): Promise<string> {
-		if (!this._model.globalState.hasData) {
-			return this.generateSimpleNoDataHtml();
+		if (!this._model.hasData()) {
+			return await this.generateSimpleNoDataHtml();
 		}
 
 		const chartJsUri = this.getChartJsUri();
@@ -203,7 +204,8 @@ export class CopilotUsageHistoryView {
 	/**
 	 * Generate simple no data view with prominent call-to-action
 	 */
-	private generateSimpleNoDataHtml(): string {
+	private async generateSimpleNoDataHtml(): Promise<string> {
+		const styles = await this.getWebviewStyles();
 		return `<!DOCTYPE html>
 		<html lang="en">
 		<head>
@@ -211,7 +213,7 @@ export class CopilotUsageHistoryView {
 			<meta name="viewport" content="width=device-width, initial-scale=1.0">
 			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'unsafe-eval' vscode-resource: https://file+.vscode-resource.vscode-cdn.net; font-src 'self' data:;">
 			<title>Copilot Usage History</title>
-			${this.getWebviewStyles()}
+			${styles}
 			<style>
 				.empty-state {
 					padding: 32px 24px;
@@ -293,8 +295,8 @@ export class CopilotUsageHistoryView {
 					scanning your chat sessions for usage events.
 				</div>
 				
-				<button class="cta-button" id="scanButton" ${this._model.globalState.isScanning ? 'disabled' : ''}>
-					${this._model.globalState.isScanning ? 'Scanning...' : 'Scan Chat Sessions'}
+				<button class="cta-button" id="scanButton" ${this._model.isScanning() ? 'disabled' : ''}>
+					${this._model.isScanning() ? 'Scanning...' : 'Scan Chat Sessions'}
 				</button>
 			</div>
 			

@@ -89,19 +89,7 @@ export class UnifiedSessionDataService {
 			this.logger.debug('Initializing UnifiedSessionDataService...');
             
 			const scanResult = await this.scanAllData();
-
-			// Feed initial events to analytics service if available
-			try {
-				// Lazy import to avoid circular deps
-				const { ServiceContainer } = await import('../types/service-container.js');
-				if (ServiceContainer.isInitialized()) {
-					const analytics = ServiceContainer.getInstance().getAnalyticsService();
-					analytics.ingest(scanResult.sessionEvents, { replace: true });
-				}
-			} catch (e) {
-				this.logger.debug(`Analytics ingestion (init) skipped: ${e}`);
-			}
-            
+           
 			if (this.options.enableRealTimeUpdates) {
 				this.startRealTimeUpdates();
 			}
@@ -209,17 +197,6 @@ export class UnifiedSessionDataService {
 			return sessionEvents;
 		}
 		return this.cachedSessionEvents;
-	}
-
-	/**
-     * Get current log entries (real-time request-level data)
-     */
-	async getLogEntries(forceRefresh = false): Promise<LogEntry[]> {
-		if (forceRefresh || this.cachedLogEntries.length === 0) {
-			const { logEntries } = await this.scanAllData();
-			return logEntries;
-		}
-		return this.cachedLogEntries;
 	}
 
 	/**
@@ -359,17 +336,6 @@ export class UnifiedSessionDataService {
 						this.logger.error(`Raw session callback error: ${error}`);
 					}
 				});
-
-				// Incremental analytics ingest
-				try {
-					const { ServiceContainer } = await import('../types/service-container.js');
-					if (ServiceContainer.isInitialized()) {
-						const analytics = ServiceContainer.getInstance().getAnalyticsService();
-						analytics.ingest(newEvents, { replace: false });
-					}
-				} catch (e) {
-					this.logger.debug(`Analytics ingestion (update) skipped: ${e}`);
-				}
                 
 				this.logger.info(`REAL-TIME  Session update complete - ${newEvents.length} events from session ${sessionResult.session.sessionId}`);
 			} catch (error) {
@@ -456,22 +422,6 @@ export class UnifiedSessionDataService {
      */
 	async refreshSessionEvents(): Promise<CopilotUsageEvent[]> {
 		return this.getSessionEvents(true);
-	}
-
-	/**
-     * Force refresh current log entries (useful for testing)
-     */
-	async refreshLogEntries(): Promise<LogEntry[]> {
-		return this.getLogEntries(true);
-	}
-
-	/**
-	 * Get raw session scan results (for analytics that need access to original session data)
-	 */
-	async getSessionScanResults(): Promise<SessionScanResult[]> {
-		// Scan all sessions and return the raw results
-		const { results } = await this.sessionScanner.scanAllSessions();
-		return results;
 	}
 
 	/**

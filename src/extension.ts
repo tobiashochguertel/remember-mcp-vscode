@@ -183,40 +183,7 @@ export class RememberMcpManager {
 		this.usageStatsManager = new UsageStatsManager();
 		this.updateStatusBar('stopped');
 		this.statusBarItem.show();
-        
-		// Get unified data service from service container
-		if (this.context) {
-			this.initializeUnifiedDataService();
-		}
 	}
-
-	/**
-     * Initialize the unified data service for real-time log monitoring
-     * Uses the service container to get the shared instance
-     */
-	private async initializeUnifiedDataService(): Promise<void> {
-		if (!this.context) {
-			return;
-		}
-
-		try {
-			// Get the shared service instance from the container
-			if (ServiceContainer.isInitialized()) {
-				this.unifiedDataService = ServiceContainer.getInstance().getUnifiedSessionDataService();
-			} else {
-				this.logger.warn('WARNING: ServiceContainer not initialized, cannot get shared service');
-				return;
-			}
-			
-			// Initialize the service if not already initialized
-			await this.unifiedDataService.initialize();
-			this.logger.info('Connected to shared unified data service for usage tracking');
-		} catch (error) {
-			this.logger.error(`Failed to connect to unified data service: ${error}`);
-		}
-	}
-
-	// Legacy static methods removed - all log handling now done through UnifiedSessionDataService
 
 	/**
      * Record a model usage in the statistics

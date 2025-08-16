@@ -244,7 +244,7 @@ export class CopilotUsageModel {
 	 */
 	public async refreshStats(): Promise<void> {
 		try {
-			const results = await this.unifiedDataService.getRawSessionResults(true); // Force refresh
+			const results = await this.unifiedDataService.getRawSessionResults();
 			this.processSessionResults(results);
 		} catch (error) {
 			console.error('Error refreshing stats:', error);

@@ -71,17 +71,10 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 	 */
 	private initializeUnifiedServiceAsync(): void {
 		try {
-			const unified = ServiceContainer.getInstance().getUnifiedSessionDataService();
 			// Fire and forget - don't await
-			unified.initialize().then(async () => {
-				this.logger.info('Unified session data service initialized successfully');
-				// Now that the data service is ready, refresh the data
-				if (this._model) {
-					await this._model.refreshAllData();
-				}
-			}).catch((error: any) => {
-				this.logger.error('Unified data service initialization failed:', error);
-			});
+			if (this._model) {
+				this._model.refreshAllData();
+			}
 		} catch (error) {
 			this.logger.error('Failed to initialize unified data service:', error);
 		}
@@ -112,12 +105,6 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 					break;
 				case 'scanChatSessions':
 					await this.scanChatSessions();
-					break;
-				case 'testCcreqProvider':
-					await this.handleTestCcreqProvider(message.ccreqUri);
-					break;
-				case 'showMore':
-					await this.handleShowMore(message.table);
 					break;
 				default:
 					this.logger.warn(`Unknown message type: ${msgType}`);
@@ -183,49 +170,8 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 		}
 	}
 
-	/**
-	 * Perform the actual clear data operation without confirmation
-	 */
-	private async performClearData(): Promise<void> {
-		if (!this._model) {return;}
 
-		try {
-			const result = await this._model.clearData();
-			this.logger.info(`Data cleared: ${result.deletedFiles} files, ${result.deletedEvents} events`);
-		} catch (error) {
-			this.logger.error('Error clearing data:', error);
-			vscode.window.showErrorMessage('Failed to clear usage data.');
-		}
-	}
 
-	/**
-	 * Handle test ccreq provider request
-	 */
-	private async handleTestCcreqProvider(ccreqUri: string): Promise<void> {
-		if (!this._model) {return;}
-
-		try {
-			const result = await this._model.testCcreqProvider(ccreqUri);
-			
-			if (!result.success) {
-				vscode.window.showErrorMessage(`❌ ccreq provider test failed: ${result.message}`);
-			}
-
-		} catch (error) {
-			this.logger.error('ccreq provider test failed:', error);
-			vscode.window.showErrorMessage(`Failed to test ccreq provider: ${error}`);
-		}
-	}
-
-	/**
-	 * Handle show more request for tables
-	 */
-	private async handleShowMore(tableName: string): Promise<void> {
-		// This would expand the table to show more items
-		// For now, just log the request
-		this.logger.info(`Show more requested for table: ${tableName}`);
-		// TODO: Implement expand functionality in model
-	}
 
 	/**
 	 * Public API methods (called from commands)
@@ -244,27 +190,11 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 	 * Scan chat sessions (public method for command interface)
 	 */
 	public async scanChatSessions(): Promise<void> {
-		if (!this._model) {return;}
+		if (!this._model) { return; }
 
-		try {
-			this.logger.info('Starting chat session scan...');
-			
-			const result = await this._model.scanChatSessions();
-			
-			if (result.events.length > 0) {
-				this.logger.info(`Session scan complete: ${result.events.length} events from ${result.stats.totalSessions} sessions`);
-				vscode.window.showInformationMessage(
-					`Processed ${result.events.length} Copilot usage events from ${result.stats.totalSessions} chat sessions`
-				);
-			} else {
-				this.logger.info('No chat sessions found');
-				vscode.window.showInformationMessage('No Copilot chat sessions found');
-			}
-
-		} catch (error) {
-			this.logger.error('Chat session scan failed:', error);
-			vscode.window.showErrorMessage(`Failed to scan chat sessions: ${error}`);
-		}
+		// No-op: scanning is not required anymore. Analytics pulls from raw session data automatically.
+		this.logger.info('scanChatSessions is a no-op; analytics uses raw session data and auto-refreshes.');
+		vscode.window.showInformationMessage('Scan chat sessions is currently a no-op. Data updates automatically from raw session history.');
 	}
 
 	/**
@@ -308,14 +238,13 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 	 * This method is called from the toolbar command which already shows confirmation
 	 */
 	public async clearStorage(): Promise<void> {
-		await this.performClearData();
 	}
 
 	/**
 	 * Check if usage data exists (public method for command interface)
 	 */
 	public hasData(): boolean {
-		return this._model?.globalState.hasData || false;
+		return this._model?.hasData() || false;
 	}
 
 	/**
