@@ -87,7 +87,7 @@ export class SessionDataTransformer {
 				const event = this.transformRequestToEvent(session, request, workspaceContext);
 				events.push(event);
 			} catch (error) {
-				this.logger.error(`Error transforming request ${request.requestId}: ${error instanceof Error ? error.stack : error}`);
+				this.logger.error(`Error transforming request ${request.turnId}: ${error instanceof Error ? error.stack : error}`);
 			}
 		}
         
@@ -103,7 +103,7 @@ export class SessionDataTransformer {
 		workspaceContext: WorkspaceContext
 	): CopilotUsageEvent {
 		// Create deterministic event ID
-		const id = this.generateEventId(session.sessionId, request.requestId);
+		const id = this.generateEventId(session.sessionId, request.turnId);
         
 		// Extract session hierarchy
 		const sessionHierarchy = this.extractSessionHierarchy(session, workspaceContext);
@@ -117,7 +117,7 @@ export class SessionDataTransformer {
         
 		// Correlate with edit state if available (session augmented earlier by UnifiedSessionDataService)
 		const editIds: string[] | undefined = (session as any).editStateRequestIds;
-		const isInEdit = !!(editIds && request.requestId && editIds.includes(request.requestId));
+		const isInEdit = !!(editIds && request.turnId && editIds.includes(request.turnId));
         
 		const source = this.determineSource(session, request);
 
@@ -147,7 +147,7 @@ export class SessionDataTransformer {
 			timestamp: new Date(typeof request.timestamp === 'number' && request.timestamp < 1e12 ? request.timestamp * 1000 : request.timestamp),
 			type: eventType,
 			source,
-			requestId: request.requestId,
+			requestId: request.turnId,
 			agent: request.agent?.id,
 			modes: normalizedModes,
             

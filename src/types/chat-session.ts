@@ -54,7 +54,7 @@ export interface RequestMetadata {
 }
 
 export interface CopilotChatRequest {
-	requestId: string;
+	turnId: string;
 	responseId: string;
 	timestamp: number; // Unix timestamp
 	modelId?: string; // Optional - not all requests have a modelId
