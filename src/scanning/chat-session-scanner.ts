@@ -39,7 +39,7 @@ export class ChatSessionScanner {
 	/**
      * Find all chat session files across VS Code storage locations
      */
-	async findAllChatSessionFiles(): Promise<string[]> {
+	private async findAllChatSessionFiles(): Promise<string[]> {
 		this.logger.info('Starting comprehensive session file scan...');
         
 		const allFiles: string[] = [];

@@ -13,7 +13,6 @@ import { SessionDataTransformer } from './session-data-transformer';
 import { GlobalLogScanner } from '../scanning/global-log-scanner';
 import { LogEntry } from '../scanning/log-types';
 import { SessionScanResult, SessionScanStats } from '../types/chat-session';
-import { EditStateScanner } from '../scanning/edit-state-scanner';
 // Removed debug unified counts feature; edit state scanner still optionally injected but no public debug method now.
 import { ILogger } from '../types/logger';
 
@@ -62,13 +61,9 @@ export class UnifiedSessionDataService {
 		private readonly logger: ILogger,
 		private readonly extensionVersion: string,
 		private readonly options: SessionDataServiceOptions = {},
-		private readonly editStateScanner?: EditStateScanner // optional integration
 	) {
 		// All dependencies are now injected - no construction here
 	}
-
-	/** Optional access to edit state scanner */
-	public getEditStateScanner(): EditStateScanner | undefined { return this.editStateScanner; }
 
 	/**
      * Initialize the service and perform initial data scan
@@ -198,115 +193,6 @@ export class UnifiedSessionDataService {
 	}
 
 	/**
-	 * Brute-force daily correlation between session requests (turns), log request entries, and edit state turns.
-	 * We attempt to attribute each edit state turn to a date using any timestamp-like field; fallback to file mtime.
-	 */
-	async getDailyTurnRequestCorrelation(days = 7): Promise<Array<{
-		date: string;
-		sessionRequests: number;
-		logEntries: number;
-		editStateTurns: number;
-		logCoveragePct: number;
-		turnsPerRequest: number;
-		missingLogRequests: number;
-	}>> {
-		if (days < 1) { days = 1; }
-		await this.loadHistoricalLogs(false);
-		const { results: sessionResults } = await this.sessionScanner.scanAllSessions();
-		let editStateResults: any[] = [];
-		if (this.editStateScanner) {
-			const { results } = await this.editStateScanner.scanAllEditStates();
-			editStateResults = results;
-		}
-		const today = new Date();
-		const targetDates: string[] = [];
-		for (let i = 0; i < days; i++) {
-			const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
-			targetDates.push(d.toISOString().slice(0, 10));
-		}
-		const sessionCounts = new Map<string, number>();
-		const logCounts = new Map<string, number>();
-		const editTurnCounts = new Map<string, number>();
-		for (const d of targetDates) { sessionCounts.set(d, 0); logCounts.set(d, 0); editTurnCounts.set(d, 0); }
-		// Session requests
-		for (const r of sessionResults) {
-			for (const req of r.session.requests) {
-				const ds = new Date(req.timestamp).toISOString().slice(0, 10);
-				if (sessionCounts.has(ds)) {
-					sessionCounts.set(ds, (sessionCounts.get(ds) || 0) + 1);
-				}
-			}
-		}
-		// Log entries
-		for (const e of this.cachedLogEntries) {
-			const ds = e.timestamp.toISOString().slice(0, 10);
-			if (logCounts.has(ds)) {
-				logCounts.set(ds, (logCounts.get(ds) || 0) + 1);
-			}
-		}
-		// Edit state turns
-		for (const es of editStateResults) {
-			// Attempt per-turn timestamps
-			const turns = Array.isArray(es.state.linearHistory) ? es.state.linearHistory : [];
-			let anyTimestamp = false;
-			for (const t of turns) {
-				if (t && typeof t === 'object') {
-					let ts: any = (t.timestamp ?? t.time ?? t.date ?? t.createdAt ?? t.updatedAt);
-					if (typeof ts === 'number') { ts = new Date(ts); }
-					else if (typeof ts === 'string') { const parsed = Date.parse(ts); if (!isNaN(parsed)) { ts = new Date(parsed); } else { ts = null; } }
-					if (ts instanceof Date && !isNaN(ts.getTime())) {
-						const ds = ts.toISOString().slice(0, 10);
-						if (editTurnCounts.has(ds)) {
-							editTurnCounts.set(ds, (editTurnCounts.get(ds) || 0) + 1);
-						}
-						anyTimestamp = true;
-					}
-				}
-			}
-			if (!anyTimestamp) {
-				// Fallback: attribute all turns to file mtime day
-				const ds = es.lastModified.toISOString().slice(0, 10);
-				if (editTurnCounts.has(ds)) {
-					editTurnCounts.set(ds, (editTurnCounts.get(ds) || 0) + turns.length);
-				}
-			}
-		}
-		return targetDates.map(d => {
-			const sr = sessionCounts.get(d) || 0;
-			const lr = logCounts.get(d) || 0;
-			const et = editTurnCounts.get(d) || 0;
-			return {
-				date: d,
-				sessionRequests: sr,
-				logEntries: lr,
-				editStateTurns: et,
-				logCoveragePct: sr > 0 ? +( (lr / sr) * 100 ).toFixed(1) : 0,
-				turnsPerRequest: sr > 0 ? +( (et / sr) ).toFixed(2) : 0,
-				missingLogRequests: sr - lr
-			};
-		});
-	}
-
-	/** Log the daily turn/request correlation */
-	async logDailyTurnRequestCorrelation(days = 7): Promise<void> {
-		const rows = await this.getDailyTurnRequestCorrelation(days);
-		this.logger.info(`Daily Turn/Request Correlation (last ${days} day(s))`);
-		this.logger.info('DATE | sessionRequests | logEntries | editStateTurns | logCoverage% | turnsPerRequest | missingLogRequests');
-		for (const r of rows) {
-			this.logger.info(`${r.date} | ${r.sessionRequests} | ${r.logEntries} | ${r.editStateTurns} | ${r.logCoveragePct}% | ${r.turnsPerRequest} | ${r.missingLogRequests}`);
-		}
-	}
-
-	/** Log comparison report to logger */
-	async logRecentDailyComparison(days = 3): Promise<void> {
-		const rows = await this.getDailyRequestComparison(days);
-		this.logger.info(`Daily request comparison (last ${days} day(s)) - historical logs loaded: ${this.historicalLogsLoaded}`);
-		for (const row of rows) {
-			this.logger.info(`${row.date}: ${row.sessionRequests} requests from sessions, ${row.logEntries} entries from logs`);
-		}
-	}
-
-	/**
      * Scan all session files and log files separately
      * Protected against concurrent scans with mutex
      */
@@ -322,43 +208,7 @@ export class UnifiedSessionDataService {
 				// Count sessions that have an empty requests array (no turns)
 				const emptyRequestSessions = results.reduce((acc, r) => acc + (r.session.requests.length === 0 ? 1 : 0), 0);
 				this.logger.info(`Empty request sessions: ${emptyRequestSessions}`);
-				// Optionally scan edit state timelines and index requestId sequences by sessionId
-				let editStateIndex: Map<string, string[]> | undefined;
-				if (this.editStateScanner) {
-					try {
-						const { sessionRequests } = await this.editStateScanner.scanAllEditStates();
-						editStateIndex = new Map(sessionRequests.map(r => [r.sessionId, r.requests]));
-						this.logger.trace(`Edit state integration: indexed ${sessionRequests.length} edit state session(s)`);
-					} catch (e) {
-						this.logger.debug(`Edit state scan failed (non-fatal): ${e}`);
-					}
-				}
-				// Attach edit state request sequences to matching sessions
-				if (editStateIndex && editStateIndex.size > 0) {
-					for (const sessionResult of results) {
-						const seq = editStateIndex.get(sessionResult.session.sessionId);
-						if (seq && seq.length > 0) {
-							(sessionResult.session as any).editStateRequestIds = seq;
-						}
-					}
-					this.logger.trace(`Edit state integration: attached sequences to ${results.filter(r => r.session.editStateRequestIds).length} session(s)`);
-					const missingEditReq = results.filter(r => !(r.session as any).editStateRequestIds).length;
-					this.logger.info(`Sessions lacking edit request IDs: ${missingEditReq}`);
-					if (missingEditReq > 0) {
-						const missingSessions = results.filter(r => !(r.session as any).editStateRequestIds);
-						this.logger.info(`Missing edit request sessions dump (${missingSessions.length}) BEGIN`);
-						for (const r of missingSessions) {
-							try {
-								const json = JSON.stringify(r.session);
-								const truncated = json.length > 1000 ? json.slice(0, 1000) + `… (truncated, totalLength=${json.length})` : json;
-								this.logger.info(`SESSION ${r.session.sessionId}: ${truncated}`);
-							} catch (e) {
-								this.logger.error(`Failed to stringify session ${r.session.sessionId}: ${e}`);
-							}
-						}
-						this.logger.info('Missing edit request sessions dump END');
-					}
-				}
+				// Optionally scan edit state timelines and index requestId sequences by sessionId				
 				
 				// Transform session data to events
 				const sessionEvents: CopilotUsageEvent[] = [];

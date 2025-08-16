@@ -133,6 +133,25 @@ export class CopilotUsageModel {
 		// Reset model usage counts (don't accumulate across refreshes)
 		const modelUsage = new Map<string, number>();
 
+		// Helper to derive a human-friendly model label from a request
+		const getModelLabel = (request: any): string => {
+			try {
+				// Prefer rich details string when available, e.g. "Gemini 2.5 Pro (Preview) • 1x"
+				const details: unknown = request?.result?.details;
+				if (typeof details === 'string' && details.trim().length > 0) {
+					// Remove trailing usage suffix like " • 1x" to avoid duplicating counts in UI
+					const cleaned = details.split(' • ')[0]?.trim();
+					if (cleaned) { return cleaned; }
+				}
+			} catch (err) {
+				this._logger.debug(`Model label extraction failed (details path): ${err}`);
+			}
+
+			// Fallback to modelId when no details are present
+			const modelId = request?.modelId;
+			return typeof modelId === 'string' && modelId.length > 0 ? modelId : 'unknown-model';
+		};
+
 		// Process each filtered session result
 		filteredResults.forEach(result => {
 			const session = result.session;
@@ -143,8 +162,8 @@ export class CopilotUsageModel {
 			
 			// Process each request in the session
 			session.requests.forEach(request => {
-				// Extract model ID (with fallback for missing modelId)
-				const modelId = request.modelId || 'unknown-model';
+				// Extract human-friendly model label (with fallbacks)
+				const modelLabel = getModelLabel(request);
 				
 				// Process toolCallRounds for accurate backend call counting
 				// According to Session Internals wiki: "toolCallRounds represents the actual backend LLM calls"
@@ -152,17 +171,17 @@ export class CopilotUsageModel {
 				if (toolCallRounds && Array.isArray(toolCallRounds)) {
 					toolCallRounds.forEach((round, index) => {
 						// Each toolCallRound represents one backend LLM call
-						const currentCount = modelUsage.get(modelId) || 0;
-						modelUsage.set(modelId, currentCount + 1);
+						const currentCount = modelUsage.get(modelLabel) || 0;
+						modelUsage.set(modelLabel, currentCount + 1);
 						
-						this._logger.trace(`Request ${request.requestId}, Round ${index}: model=${modelId}, roundId=${round.id}`);
+						this._logger.trace(`Request ${request.requestId}, Round ${index}: model=${modelLabel}, roundId=${round.id}`);
 					});
 				} else {
 					// Fallback: if no toolCallRounds, count as 1 request (for older session format compatibility)
-					const currentCount = modelUsage.get(modelId) || 0;
-					modelUsage.set(modelId, currentCount + 1);
+					const currentCount = modelUsage.get(modelLabel) || 0;
+					modelUsage.set(modelLabel, currentCount + 1);
 					
-					this._logger.trace(`Request ${request.requestId}: model=${modelId}, no toolCallRounds (fallback count=1)`);
+					this._logger.trace(`Request ${request.requestId}: model=${modelLabel}, no toolCallRounds (fallback count=1)`);
 				}
 			});
 		});

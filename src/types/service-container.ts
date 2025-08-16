@@ -10,7 +10,6 @@ import { ILogger } from './logger';
 import { UnifiedSessionDataService, SessionDataServiceOptions } from '../services/unified-session-data-service';
 import { AnalyticsService } from '../services/analytics-service';
 import { ChatSessionScanner } from '../scanning/chat-session-scanner';
-import { EditStateScanner } from '../scanning/edit-state-scanner';
 // Switched to GlobalLogScanner for unified monitoring across instances
 import { GlobalLogScanner } from '../scanning/global-log-scanner';
 import { SessionDataTransformer } from '../services/session-data-transformer';
@@ -31,7 +30,6 @@ export class ServiceContainer {
     
 	private _unifiedSessionDataService?: UnifiedSessionDataService;
 	private _analyticsService?: AnalyticsService;
-	private _editStateScanner?: EditStateScanner;
     
 	private constructor(
 		private readonly extensionContext: vscode.ExtensionContext,
@@ -109,10 +107,6 @@ export class ServiceContainer {
 				this.extensionVersion
 			);
 			
-			// Create unified service with injected dependencies
-			// Lazily create edit state scanner but do not force scan here
-			const editStateScanner = this.getEditStateScanner();
-
 			this._unifiedSessionDataService = new UnifiedSessionDataService(
 				sessionScanner,
 				logScanner,
@@ -120,7 +114,6 @@ export class ServiceContainer {
 				this.logger,
 				this.extensionVersion,
 				this.sessionDataServiceOptions,
-				editStateScanner
 			);
 		}
 		return this._unifiedSessionDataService;
@@ -145,26 +138,6 @@ export class ServiceContainer {
 			this._analyticsService = new AnalyticsService(this.logger);
 		}
 		return this._analyticsService;
-	}
-
-	/**
-	 * Get (or create) the edit state scanner singleton
-	 */
-	getEditStateScanner(): EditStateScanner {
-		if (!this._editStateScanner) {
-			this.logger.info('Creating EditStateScanner instance');
-			const storagePaths = this.getVSCodeStoragePaths();
-			this._editStateScanner = new EditStateScanner(
-				storagePaths,
-				this.logger,
-				{
-					enableWatching: this.sessionDataServiceOptions.enableRealTimeUpdates ?? true,
-					debounceMs: this.sessionDataServiceOptions.debounceMs ?? 500,
-					maxRetries: 3
-				}
-			);
-		}
-		return this._editStateScanner;
 	}
 
 	/**
@@ -197,10 +170,6 @@ export class ServiceContainer {
 		if (this._unifiedSessionDataService) {
 			this._unifiedSessionDataService.dispose();
 			this._unifiedSessionDataService = undefined;
-		}
-		if (this._editStateScanner) {
-			this._editStateScanner.dispose();
-			this._editStateScanner = undefined;
 		}
 		this._analyticsService = undefined;
         

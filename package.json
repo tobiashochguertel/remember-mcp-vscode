@@ -96,13 +96,7 @@
         "title": "Scan Chat Sessions",
         "category": "Copilot Usage History",
         "icon": "$(sync)"
-      },
-      {
-        "command": "remember-mcp.scanEditStates",
-        "title": "Scan Edit State Timelines",
-        "category": "Copilot Usage History",
-        "icon": "$(search)"
-      }
+  }
     ],
     "menus": {
       "view/title": [
