@@ -44,6 +44,8 @@ export class UnifiedSessionDataService {
 	// Single-flight promise to coalesce concurrent full scans (prevents double scan during startup)
 	private currentScanPromise?: Promise<{ results: SessionScanResult[]; logEntries: LogEntry[]; stats: SessionScanStats }>;
 
+	public isScanning = false;
+
 	/** Indicates whether historical global logs were loaded into cache */
 	private isHistoricalLogsLoaded(): boolean { return this.historicalLogsLoaded; }
 
@@ -104,7 +106,9 @@ export class UnifiedSessionDataService {
 		this.currentScanPromise = this.scanMutex.runExclusive(async () => {
 			try {
 				// Scan session files
+				this.isScanning = true;
 				const { results, stats } = await this.sessionScanner.scanAllSessions();
+				this.isScanning = false;
 				// Count sessions that have an empty requests array (no turns)
 				const emptyRequestSessions = results.reduce((acc, r) => acc + (r.session.turns.length === 0 ? 1 : 0), 0);
 				this.logger.info(`Empty request sessions: ${emptyRequestSessions}`);

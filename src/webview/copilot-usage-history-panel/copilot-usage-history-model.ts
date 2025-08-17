@@ -16,7 +16,6 @@ import { ILogger } from '../../types/logger';
 export class CopilotUsageHistoryModel {
 	private _listeners: Array<() => void> = [];
 	private _errorMessage: string | undefined;
-	private _isScanning: boolean = false;
 
 	// Global filter state (authoritative in-memory runtime filters)
 	private _filters: GlobalFilters = {
@@ -279,7 +278,7 @@ export class CopilotUsageHistoryModel {
 	}
 
 	public isScanning(): boolean {
-		return this._isScanning;
+		return this.analyticsService.isScanning();
 	}
 
 	// ---------- New helpers using AnalyticsService / Unified data ----------

@@ -268,7 +268,7 @@ export class AnalyticsService {
 		const model = turn.modelId || undefined;
 		const latencyMs = turn.result?.timings?.totalElapsed;
 		const turnId = turn.responseId || turn.turnId;
-		const modelRequests = turn.result?.metadata?.modelRequests || (turn as any).modelRequests || [];
+		const modelRequests = turn.result?.metadata?.toolCallRounds || [];
 		const filePath = this.extractFirstFilePath(turn);
 		const language = this.inferLanguage(turn);
 		return {
@@ -346,6 +346,10 @@ export class AnalyticsService {
 			return '"' + s.replace(/"/g, '""') + '"';
 		}
 		return s;
+	}
+
+	isScanning(): boolean {
+		return this.unified.isScanning;
 	}
 
 	// Wire-up helpers
