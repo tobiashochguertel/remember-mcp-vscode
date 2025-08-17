@@ -101,6 +101,12 @@ export class CopilotUsageHistoryModel {
 
 		// Start background data initialization (non-blocking)
 		this.initializeDataAsync();
+
+		// Subscribe to analytics updates so the panel can refresh when analytics change
+		this.analyticsService.onAnalyticsUpdated(() => {
+			this.logger.trace?.('HistoryModel: analytics updated -> refreshing view models');
+			this.refreshAllData().catch(err => this.logger.error('HistoryModel: refresh after analytics update failed', err));
+		});
 	}
 
 	/**
@@ -269,6 +275,7 @@ export class CopilotUsageHistoryModel {
 	public dispose(): void {
 		// Clear listeners
 		this._listeners = [];
+		// No explicit unsubscribe available for analytics; instance lifespan is tied to panel lifespan
 	}
 
 	public isScanning(): boolean {

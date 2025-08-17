@@ -59,6 +59,8 @@ export class AnalyticsService {
 	private rawSessions: SessionScanResult[] = [];
 	private logger: ILogger;
 	private unified: UnifiedSessionDataService;
+	// Subscribers to analytics updates
+	private analyticsCallbacks: Array<() => void> = [];
 
 	constructor(logger: ILogger, unified: UnifiedSessionDataService) {
 		this.logger = logger;
@@ -67,6 +69,27 @@ export class AnalyticsService {
 		this.initializeRawSessionSource().catch(err => {
 			this.logger.error(`Raw session init skipped: ${err}`);
 		});
+	}
+
+	/** Subscribe to analytics updates (KPIs/agents/models/activity may have changed) */
+	onAnalyticsUpdated(callback: () => void): void {
+		this.analyticsCallbacks.push(callback);
+	}
+
+	/** Remove analytics update callback */
+	removeAnalyticsCallback(callback: () => void): void {
+		const i = this.analyticsCallbacks.indexOf(callback);
+		if (i !== -1) {
+			this.analyticsCallbacks.splice(i, 1);
+		}
+	}
+
+	private emitAnalyticsUpdated(): void {
+		if (this.analyticsCallbacks.length === 0) { return; }
+		this.logger.trace?.(`AnalyticsService: notifying ${this.analyticsCallbacks.length} subscriber(s)`);
+		for (const cb of this.analyticsCallbacks) {
+			try { cb(); } catch (e) { this.logger.error?.(`Analytics callback error: ${e}`); }
+		}
 	}
 
 	getKpis(filter?: AnalyticsFilter): Kpis {
@@ -327,11 +350,14 @@ export class AnalyticsService {
 			// Seed cache
 			this.rawSessions = await this.unified.getRawSessionResults();
 			this.logger.debug(`Seeded ${this.rawSessions.length} raw sessions`);
+			// Let listeners know initial analytics are ready
+			this.emitAnalyticsUpdated();
 			// Subscribe to incremental raw session updates
 			this.unified.onRawSessionResultsUpdated((results: SessionScanResult[]) => {
 				try {
 					this.mergeRawSessions(results);
 					this.logger.trace(`Merged ${results.length} raw session updates (total: ${this.rawSessions.length})`);
+					this.emitAnalyticsUpdated();
 				} catch (e) {
 					this.logger.error(`Raw session update failed: ${e}`);
 				}
@@ -362,6 +388,7 @@ export class AnalyticsService {
 				this.mergeRawSessions(results);
 				this.logger.debug(`Refreshed raw sessions (merge): ${this.rawSessions.length}`);
 			}
+			this.emitAnalyticsUpdated();
 		} catch (e) {
 			this.logger.debug(`refreshFromUnifiedService error: ${e}`);
 		}
