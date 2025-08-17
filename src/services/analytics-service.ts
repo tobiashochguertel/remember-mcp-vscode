@@ -1,5 +1,5 @@
 import { ILogger } from '../types/logger';
-import { SessionScanResult, CopilotChatRequest } from '../types/chat-session';
+import { SessionScanResult, CopilotChatTurn } from '../types/chat-session';
 import { UnifiedSessionDataService } from './unified-session-data-service';
 
 export type TimeRange = 'today' | '7d' | '30d' | '90d' | 'all';
@@ -21,6 +21,7 @@ export interface Kpis {
 	editRatio: number;
 	models: number;
 	agents: number;
+	requests: number;
 }
 
 export interface AgentStat {
@@ -93,24 +94,25 @@ export class AnalyticsService {
 	}
 
 	getKpis(filter?: AnalyticsFilter): Kpis {
-		const reqs = this.applyFilterToRequests(this.flattenRequests(), filter);
-		const sessions = new Set(reqs.map(r => r.sessionId)).size;
-		const files = new Set(reqs.map(r => r.filePath).filter(Boolean)).size;
-		const models = new Set(reqs.map(r => r.model).filter(Boolean)).size;
-		const agents = new Set(reqs.map(r => r.agent).filter(Boolean)).size;
-		const latencies = reqs.map(r => r.latencyMs).filter((v): v is number => typeof v === 'number' && !isNaN(v));
+		const turns = this.applyFilterToTurns(this.flattenTurns(), filter);
+		const sessions = new Set(turns.map(r => r.sessionId)).size;
+		const files = new Set(turns.map(r => r.filePath).filter(Boolean)).size;
+		const models = new Set(turns.map(r => r.model).filter(Boolean)).size;
+		const agents = new Set(turns.map(r => r.agent).filter(Boolean)).size;
+		const latencies = turns.map(r => r.latencyMs).filter((v): v is number => typeof v === 'number' && !isNaN(v));
 		const latencyMsMedian = this.median(latencies) ?? 0;
+		const requests = turns.reduce((sum, r) => sum + (Array.isArray(r.modelRequests) ? r.modelRequests.length : 0), 0);
 
 		// edits approximation: count requests with mode 'edit'
-		const edits = reqs.filter(r => r.type === 'edit').length;
-		const requests = reqs.length;
-		const editRatio = requests > 0 ? edits / requests : 0;
+		const edits = turns.filter(r => r.type === 'edit').length;
+		const turnCount = turns.length;
+		const editRatio = turnCount > 0 ? edits / turnCount : 0;
 
-		return { turns: requests, sessions, files, edits, latencyMsMedian, editRatio, models, agents };
+		return { turns: turnCount, sessions, files, edits, latencyMsMedian, editRatio, models, agents, requests: requests };
 	}
 
 	getAgents(filter?: AnalyticsFilter, limit = 5): AgentStat[] {
-		const reqs = this.applyFilterToRequests(this.flattenRequests(), filter);
+		const reqs = this.applyFilterToTurns(this.flattenTurns(), filter);
 		const byAgent = new Map<string, Array<typeof reqs[number]>>();
 		for (const r of reqs) {
 			const key = r.agent || 'unknown';
@@ -137,7 +139,7 @@ export class AnalyticsService {
 	}
 
 	getModels(filter?: AnalyticsFilter, limit = 5): ModelStat[] {
-		const reqs = this.applyFilterToRequests(this.flattenRequests(), filter);
+		const reqs = this.applyFilterToTurns(this.flattenTurns(), filter);
 		const byModel = new Map<string, Array<typeof reqs[number]>>();
 		for (const r of reqs) {
 			const key = r.model || 'unknown';
@@ -157,7 +159,7 @@ export class AnalyticsService {
 	}
 
 	private getLanguages(filter?: AnalyticsFilter, limit = 10): LanguageStat[] {
-		const reqs = this.applyFilterToRequests(this.flattenRequests(), filter);
+		const reqs = this.applyFilterToTurns(this.flattenTurns(), filter);
 		const byLang = new Map<string, number>();
 		for (const r of reqs) {
 			const key = (r.language && r.language.trim()) || 'unknown';
@@ -170,7 +172,7 @@ export class AnalyticsService {
 	}
 
 	getActivity(filter?: AnalyticsFilter, limit = 20): ActivityItem[] {
-		const reqs = this.applyFilterToRequests(this.flattenRequests(), filter);
+		const reqs = this.applyFilterToTurns(this.flattenTurns(), filter);
 		const items: ActivityItem[] = reqs
 			.slice(-limit)
 			.reverse()
@@ -182,7 +184,7 @@ export class AnalyticsService {
 				file: r.filePath,
 				latencyMs: r.latencyMs,
 				sessionId: r.sessionId,
-				requestId: r.requestId
+				requestId: r.turnId
 			}));
 		return items;
 	}
@@ -204,7 +206,7 @@ export class AnalyticsService {
 	}
 
 	// Helpers
-	private applyFilterToRequests(requests: Array<ReturnType<AnalyticsService['mapRequest']>>, filter?: AnalyticsFilter): Array<ReturnType<AnalyticsService['mapRequest']>> {
+	private applyFilterToTurns(requests: Array<ReturnType<AnalyticsService['mapTurn']>>, filter?: AnalyticsFilter): Array<ReturnType<AnalyticsService['mapTurn']>> {
 		if (!filter) {
 			return requests;
 		}
@@ -244,13 +246,13 @@ export class AnalyticsService {
 		return reqs;
 	}
 
-	private flattenRequests(): Array<ReturnType<AnalyticsService['mapRequest']>> {
-		const out: Array<ReturnType<AnalyticsService['mapRequest']>> = [];
+	private flattenTurns(): Array<ReturnType<AnalyticsService['mapTurn']>> {
+		const out: Array<ReturnType<AnalyticsService['mapTurn']>> = [];
 		for (const s of this.rawSessions) {
 			const workspaceId = s.harvestedMetadata?.workspaceId;
 			const sessionId = s.session.sessionId;
-			for (const req of s.session.requests) {
-				out.push(this.mapRequest(req, sessionId, workspaceId));
+			for (const turn of s.session.turns) {
+				out.push(this.mapTurn(turn, sessionId, workspaceId));
 			}
 		}
 		// Keep stable order by time
@@ -258,16 +260,17 @@ export class AnalyticsService {
 		return out;
 	}
 
-	private mapRequest(req: CopilotChatRequest, sessionId: string, workspaceId?: string) {
-		const timestamp = new Date(req.timestamp);
-		const modes = Array.isArray(req.modes) ? req.modes : [];
+	private mapTurn(turn: CopilotChatTurn, sessionId: string, workspaceId?: string) {
+		const timestamp = new Date(turn.timestamp);
+		const modes = Array.isArray(turn.modes) ? turn.modes : [];
 		const type = modes[0] || 'ask';
-		const agent = req.agent?.id || undefined;
-		const model = req.modelId || undefined;
-		const latencyMs = req.result?.timings?.totalElapsed;
-		const requestId = req.responseId || req.turnId;
-		const filePath = this.extractFirstFilePath(req);
-		const language = this.inferLanguage(req);
+		const agent = turn.agent?.id || undefined;
+		const model = turn.modelId || undefined;
+		const latencyMs = turn.result?.timings?.totalElapsed;
+		const turnId = turn.responseId || turn.turnId;
+		const modelRequests = turn.result?.metadata?.modelRequests || (turn as any).modelRequests || [];
+		const filePath = this.extractFirstFilePath(turn);
+		const language = this.inferLanguage(turn);
 		return {
 			// Core
 			sessionId,
@@ -278,12 +281,13 @@ export class AnalyticsService {
 			model,
 			filePath,
 			latencyMs,
-			requestId,
+			turnId,
 			language,
+			modelRequests,
 		};
 	}
 
-	private extractFirstFilePath(req: CopilotChatRequest): string | undefined {
+	private extractFirstFilePath(req: CopilotChatTurn): string | undefined {
 		const refs = req.contentReferences || [];
 		for (const r of refs) {
 			const ref = (r as any).reference || {};
@@ -295,7 +299,7 @@ export class AnalyticsService {
 		return undefined;
 	}
 
-	private inferLanguage(req: CopilotChatRequest): string | undefined {
+	private inferLanguage(req: CopilotChatTurn): string | undefined {
 		// Try codeBlocks language
 		const blocks = (req.result as any)?.metadata?.codeBlocks || (req as any).codeBlocks;
 		if (Array.isArray(blocks)) {

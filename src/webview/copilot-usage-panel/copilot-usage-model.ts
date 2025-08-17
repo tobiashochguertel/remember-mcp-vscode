@@ -161,7 +161,7 @@ export class CopilotUsageModel {
 			this._logger.trace(`Processing session ${session.sessionId} from workspace ${metadata?.workspaceId || 'unknown'} (${metadata?.vscodeVariant || 'unknown'})`);
 			
 			// Process each request in the session
-			session.requests.forEach(request => {
+			session.turns.forEach(request => {
 				// Extract human-friendly model label (with fallbacks)
 				const modelLabel = getModelLabel(request);
 				

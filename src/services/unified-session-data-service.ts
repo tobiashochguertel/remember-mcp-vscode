@@ -106,14 +106,14 @@ export class UnifiedSessionDataService {
 				// Scan session files
 				const { results, stats } = await this.sessionScanner.scanAllSessions();
 				// Count sessions that have an empty requests array (no turns)
-				const emptyRequestSessions = results.reduce((acc, r) => acc + (r.session.requests.length === 0 ? 1 : 0), 0);
+				const emptyRequestSessions = results.reduce((acc, r) => acc + (r.session.turns.length === 0 ? 1 : 0), 0);
 				this.logger.info(`Empty request sessions: ${emptyRequestSessions}`);
 				// Cache raw session results only; no event transformation
 				this.cachedRawSessionResults = results;
 				const logEntries: LogEntry[] = [];
 				this.cachedLogEntries = logEntries;
 				this.lastScanStats = stats;
-				this.logger.trace(`Scanned ${results.length} sessions; cached ${results.length} raw sessions and ${logEntries.length} log entries`);
+				this.logger.info(`Scanned ${results.length} sessions; cached ${results.length} raw sessions and ${logEntries.length} log entries`);
 				return { results, logEntries, stats };
 			} catch (error) {
 				this.logger.error(`Scan failed: ${error}`);
@@ -131,7 +131,7 @@ export class UnifiedSessionDataService {
 	 * Performs a full scan only if the cache is empty; otherwise returns cached results.
 	 */
 	async getRawSessionResults(): Promise<SessionScanResult[]> {
-		if (this.cachedRawSessionResults.length === 0) {
+		if (this.cachedRawSessionResults?.length === 0) {
 			const { results } = await this.scanAllData();
 			return results;
 		}

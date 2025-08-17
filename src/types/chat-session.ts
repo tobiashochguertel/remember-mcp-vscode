@@ -12,9 +12,7 @@ export interface CopilotChatSession {
 	responderUsername: string;
 	initialLocation: string;
 	isImported?: boolean;
-	requests: CopilotChatRequest[];
-	// Optional: sequence of edit state requestIds (if edit state timelines scanned & matched by sessionId)
-	editStateRequestIds?: string[];
+	turns: CopilotChatTurn[];
 }
 
 /**
@@ -53,7 +51,7 @@ export interface RequestMetadata {
 	[key: string]: any;                   // Allow for additional metadata fields
 }
 
-export interface CopilotChatRequest {
+export interface CopilotChatTurn {
 	turnId: string;
 	responseId: string;
 	timestamp: number; // Unix timestamp
