@@ -12,7 +12,6 @@ import { AnalyticsService } from '../services/analytics-service';
 import { ChatSessionScanner } from '../scanning/chat-session-scanner';
 // Switched to GlobalLogScanner for unified monitoring across instances
 import { GlobalLogScanner } from '../scanning/global-log-scanner';
-import { SessionDataTransformer } from '../services/session-data-transformer';
 import { SESSION_SCAN_CONSTANTS } from './chat-session';
 
 export interface ServiceContainerOptions {
@@ -101,16 +100,9 @@ export class ServiceContainer {
 			// Create global log scanner (replaces prior CopilotLogScanner)
 			const logScanner = new GlobalLogScanner(this.logger);
 			
-			// Create session data transformer
-			const sessionTransformer = new SessionDataTransformer(
-				this.logger,
-				this.extensionVersion
-			);
-			
 			this._unifiedSessionDataService = new UnifiedSessionDataService(
 				sessionScanner,
 				logScanner,
-				sessionTransformer,
 				this.logger,
 				this.extensionVersion,
 				this.sessionDataServiceOptions,

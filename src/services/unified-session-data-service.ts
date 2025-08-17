@@ -6,9 +6,7 @@
  */
 
 import { Mutex } from 'async-mutex';
-import { CopilotUsageEvent } from '../types/usage-events';
 import { ChatSessionScanner } from '../scanning/chat-session-scanner';
-import { SessionDataTransformer } from './session-data-transformer';
 // Switched from CopilotLogScanner to GlobalLogScanner for unified log monitoring
 import { GlobalLogScanner } from '../scanning/global-log-scanner';
 import { LogEntry } from '../scanning/log-types';
@@ -38,18 +36,16 @@ export class UnifiedSessionDataService {
 	private sessionUpdateMutex = new Mutex();
     
 	// Separate callback arrays for different event types
-	private sessionEventCallbacks: Array<(events: CopilotUsageEvent[]) => void> = [];
 	private logEventCallbacks: Array<(entries: LogEntry[]) => void> = [];
 	private rawSessionCallbacks: Array<(results: SessionScanResult[]) => void> = [];
     
 	// Separate caches for different data types
-	private cachedSessionEvents: CopilotUsageEvent[] = [];
 	private cachedLogEntries: LogEntry[] = [];
 	private cachedRawSessionResults: SessionScanResult[] = [];
 	private lastScanStats?: SessionScanStats;
 	private historicalLogsLoaded = false;
 	// Single-flight promise to coalesce concurrent full scans (prevents double scan during startup)
-	private currentScanPromise?: Promise<{ sessionEvents: CopilotUsageEvent[]; logEntries: LogEntry[]; stats: SessionScanStats }>;
+	private currentScanPromise?: Promise<{ results: SessionScanResult[]; logEntries: LogEntry[]; stats: SessionScanStats }>;
 
 	/** Indicates whether historical global logs were loaded into cache */
 	isHistoricalLogsLoaded(): boolean { return this.historicalLogsLoaded; }
@@ -57,7 +53,6 @@ export class UnifiedSessionDataService {
 	constructor(
 		private readonly sessionScanner: ChatSessionScanner,
 		private readonly logScanner: GlobalLogScanner | undefined,
-		private readonly sessionTransformer: SessionDataTransformer,
 		private readonly logger: ILogger,
 		private readonly extensionVersion: string,
 		private readonly options: SessionDataServiceOptions = {},
@@ -69,12 +64,12 @@ export class UnifiedSessionDataService {
      * Initialize the service and perform initial data scan
      * Protected against race conditions with mutex
      */
-	async initialize(): Promise<{ sessionEvents: CopilotUsageEvent[]; logEntries: LogEntry[]; stats: SessionScanStats }> {
+	async initialize(): Promise<{ results: SessionScanResult[]; logEntries: LogEntry[]; stats: SessionScanStats }> {
 		return await this.initializationMutex.runExclusive(async () => {
 			if (this.isInitialized) {
 				this.logger.trace('Already initialized, returning cached data');
 				return {
-					sessionEvents: this.cachedSessionEvents,
+					results: this.cachedRawSessionResults,
 					logEntries: this.cachedLogEntries,
 					stats: this.lastScanStats || {
 						totalSessions: 0,
@@ -95,7 +90,7 @@ export class UnifiedSessionDataService {
 			}
             
 			this.isInitialized = true;
-			this.logger.info(`Initialized with ${scanResult.sessionEvents.length} session events, ${scanResult.logEntries.length} log entries (historical logs loaded: ${this.historicalLogsLoaded})`);
+			this.logger.info(`Initialized with ${scanResult.results.length} raw sessions, ${scanResult.logEntries.length} log entries (historical logs loaded: ${this.historicalLogsLoaded})`);
 			return scanResult;
 		});
 	}
@@ -104,7 +99,7 @@ export class UnifiedSessionDataService {
      * Scan all session files and log files separately
      * Protected against concurrent scans with mutex
      */
-	async scanAllData(): Promise<{ sessionEvents: CopilotUsageEvent[]; logEntries: LogEntry[]; stats: SessionScanStats }> {
+	async scanAllData(): Promise<{ results: SessionScanResult[]; logEntries: LogEntry[]; stats: SessionScanStats }> {
 		// If a scan is already in flight, return its promise (single-flight behavior)
 		if (this.currentScanPromise) {
 			return this.currentScanPromise;
@@ -116,67 +111,13 @@ export class UnifiedSessionDataService {
 				// Count sessions that have an empty requests array (no turns)
 				const emptyRequestSessions = results.reduce((acc, r) => acc + (r.session.requests.length === 0 ? 1 : 0), 0);
 				this.logger.info(`Empty request sessions: ${emptyRequestSessions}`);
-				// Optionally scan edit state timelines and index requestId sequences by sessionId				
-				
-				// Transform session data to events
-				const sessionEvents: CopilotUsageEvent[] = [];
-				for (const sessionResult of results) {
-					const events = await this.sessionTransformer.transformSessionToEvents(sessionResult);
-					sessionEvents.push(...events);
-				}
-
-				// Edit correlation summary
-				try {
-					const editLinked = sessionEvents.filter(e => e.isInEdit).length;
-					const total = sessionEvents.length;
-					const pct = total > 0 ? ((editLinked / total) * 100).toFixed(1) : '0.0';
-					this.logger.info(`Edit correlation: ${editLinked}/${total} (${pct}%) events linked to edit state; ${total - editLinked} without edit linkage`);
-
-					// Breakdown of missing edit linkage
-					const missing = sessionEvents.filter(e => !e.isInEdit);
-					if (missing.length > 0) {
-						const countsByType = new Map<string, number>();
-						for (const ev of missing) {
-							countsByType.set(ev.type, (countsByType.get(ev.type) || 0) + 1);
-						}
-						this.logger.info(`Missing edit linkage by event type: ${[...countsByType.entries()].map(([t,c]) => `${t}:${c}`).join(', ')}`);
-						const countsByMode = new Map<string, number>();
-						for (const ev of missing) {
-							const modeKey = ev.modes && ev.modes.length > 0 ? ev.modes[0] : 'none';
-							countsByMode.set(modeKey, (countsByMode.get(modeKey) || 0) + 1);
-						}
-						this.logger.info(`Missing edit linkage by mode: ${[...countsByMode.entries()].map(([m,c]) => `${m}:${c}`).join(', ')}`);
-						if (countsByMode.has('none')) {
-							const missingModeEvents = missing.filter(ev => !ev.modes || ev.modes.length === 0);
-							const agentCounts = new Map<string, number>();
-							const sourceCounts = new Map<string, number>();
-							for (const ev of missingModeEvents) {
-								agentCounts.set(ev.agent || 'no-agent', (agentCounts.get(ev.agent || 'no-agent') || 0) + 1);
-								sourceCounts.set(ev.source, (sourceCounts.get(ev.source) || 0) + 1);
-							}
-							const sampleReqIds = missingModeEvents.map(e => e.requestId).filter(Boolean).slice(0, 8).join(', ');
-							this.logger.info(
-								`Mode diagnostics (none bucket): events=${missingModeEvents.length}; agents=${[...agentCounts.entries()].map(([a,c]) => `${a}:${c}`).join(', ')}; sources=${[...sourceCounts.entries()].map(([s,c]) => `${s}:${c}`).join(', ')}; sampleRequestIds=${sampleReqIds || 'n/a'}`
-							);
-						}
-						for (const [t] of countsByType.entries()) {
-							const sampleSessions = Array.from(new Set(missing.filter(e => e.type === t).map(e => e.sessionId))).slice(0, 5);
-							this.logger.trace(`Missing edit linkage sample sessions for type ${t}: ${sampleSessions.join(', ') || 'none'}`);
-						}
-					}
-				} catch (e) {
-					this.logger.debug(`Edit correlation summary failed: ${e}`);
-				}
-
-				// Sort session events by timestamp
-				sessionEvents.sort((a: CopilotUsageEvent, b: CopilotUsageEvent) => a.timestamp.getTime() - b.timestamp.getTime());
-				const logEntries: LogEntry[] = [];
-				this.cachedSessionEvents = sessionEvents;
-				this.cachedLogEntries = logEntries;
+				// Cache raw session results only; no event transformation
 				this.cachedRawSessionResults = results;
+				const logEntries: LogEntry[] = [];
+				this.cachedLogEntries = logEntries;
 				this.lastScanStats = stats;
-				this.logger.trace(`Scanned ${results.length} sessions, generated ${sessionEvents.length} session events and ${logEntries.length} log entries`);
-				return { sessionEvents, logEntries, stats };
+				this.logger.trace(`Scanned ${results.length} sessions; cached ${results.length} raw sessions and ${logEntries.length} log entries`);
+				return { results, logEntries, stats };
 			} catch (error) {
 				this.logger.error(`Scan failed: ${error}`);
 				throw error;
@@ -186,17 +127,6 @@ export class UnifiedSessionDataService {
 			}
 		});
 		return this.currentScanPromise;
-	}
-
-	/**
-     * Get current session events (complete turn-based data)
-     */
-	async getSessionEvents(forceRefresh = false): Promise<CopilotUsageEvent[]> {
-		if (forceRefresh || this.cachedSessionEvents.length === 0) {
-			const { sessionEvents } = await this.scanAllData();
-			return sessionEvents;
-		}
-		return this.cachedSessionEvents;
 	}
 
 	/**
@@ -220,14 +150,6 @@ export class UnifiedSessionDataService {
 
 
 	/**
-     * Subscribe to session event updates (complete turn-based data)
-     */
-	onSessionEventsUpdated(callback: (events: CopilotUsageEvent[]) => void): void {
-		this.sessionEventCallbacks.push(callback);
-		this.logger.trace(`Session callback added - now have ${this.sessionEventCallbacks.length} callbacks`);
-	}
-
-	/**
      * Subscribe to log entry updates (real-time request-level data)
      */
 	onLogEntriesUpdated(callback: (entries: LogEntry[]) => void): void {
@@ -241,16 +163,6 @@ export class UnifiedSessionDataService {
 	onRawSessionResultsUpdated(callback: (results: SessionScanResult[]) => void): void {
 		this.rawSessionCallbacks.push(callback);
 		this.logger.trace(`Raw session callback added - now have ${this.rawSessionCallbacks.length} callbacks`);
-	}
-
-	/**
-     * Remove session event callback
-     */
-	removeSessionEventCallback(callback: (events: CopilotUsageEvent[]) => void): void {
-		const index = this.sessionEventCallbacks.indexOf(callback);
-		if (index > -1) {
-			this.sessionEventCallbacks.splice(index, 1);
-		}
 	}
 
 	/**
@@ -282,48 +194,25 @@ export class UnifiedSessionDataService {
 		}
 
 		// Start watching session files
-		this.logger.info(`Starting session file watching with ${this.sessionEventCallbacks.length} callbacks`);
+		this.logger.info(`Starting session file watching with ${this.rawSessionCallbacks.length} raw-session callbacks`);
 		this.sessionScanner.startWatching(async (sessionResult: SessionScanResult) => {
 			try {
 				this.logger.trace(`REAL-TIME  Received session ${sessionResult.session.sessionId}`);
-                
-				// Transform new/updated session to events
-				const newEvents = await this.sessionTransformer.transformSessionToEvents(sessionResult);
-				this.logger.trace(`REAL-TIME  Transformed to ${newEvents.length} events`);
-                
-				// Update cached session events (replace events from same session) - protected by mutex
+				
+				// Update cached raw session results (replace session with same sessionId) - protected by mutex
 				await this.sessionUpdateMutex.runExclusive(async () => {
-					const beforeCount = this.cachedSessionEvents.length;
-					this.cachedSessionEvents = this.cachedSessionEvents.filter(
-						(event: CopilotUsageEvent) => event.sessionId !== sessionResult.session.sessionId
-					);
-					this.cachedSessionEvents.push(...newEvents);
-                    
-					// Also update cached raw session results (replace session with same sessionId)
 					const beforeRawCount = this.cachedRawSessionResults.length;
 					this.cachedRawSessionResults = this.cachedRawSessionResults.filter(
 						(result: SessionScanResult) => result.session.sessionId !== sessionResult.session.sessionId
 					);
 					this.cachedRawSessionResults.push(sessionResult);
-                    
-					// Sort by timestamp
-					this.cachedSessionEvents.sort((a: CopilotUsageEvent, b: CopilotUsageEvent) => a.timestamp.getTime() - b.timestamp.getTime());
+					
+					// Sort by creationDate
 					this.cachedRawSessionResults.sort((a: SessionScanResult, b: SessionScanResult) => 
 						new Date(a.session.creationDate).getTime() - new Date(b.session.creationDate).getTime()
 					);
-                    
-					this.logger.trace(`REAL-TIME  Cache updated from ${beforeCount} to ${this.cachedSessionEvents.length} events, ${beforeRawCount} to ${this.cachedRawSessionResults.length} raw sessions`);
-				});
-                
-				// Notify session event callbacks
-				this.logger.trace(`REAL-TIME  Notifying ${this.sessionEventCallbacks.length} callbacks`);
-				this.sessionEventCallbacks.forEach((callback, index) => {
-					try {
-						this.logger.trace(`REAL-TIME  Calling callback ${index + 1}/${this.sessionEventCallbacks.length}`);
-						callback(this.cachedSessionEvents);
-					} catch (error) {
-						this.logger.error(` ${error}`);
-					}
+					
+					this.logger.trace(`REAL-TIME  Raw cache updated from ${beforeRawCount} to ${this.cachedRawSessionResults.length} sessions`);
 				});
 
 				// Notify raw session result callbacks with only the updated session (incremental)
@@ -336,8 +225,8 @@ export class UnifiedSessionDataService {
 						this.logger.error(`Raw session callback error: ${error}`);
 					}
 				});
-                
-				this.logger.info(`REAL-TIME  Session update complete - ${newEvents.length} events from session ${sessionResult.session.sessionId}`);
+				
+				this.logger.info(`REAL-TIME  Session update complete for session ${sessionResult.session.sessionId}`);
 			} catch (error) {
 				this.logger.error(`Error processing session update: ${error}`);
 			}
@@ -405,23 +294,14 @@ export class UnifiedSessionDataService {
      */
 	getWatcherStatus(): { 
 		isWatching: boolean; 
-		sessionCallbackCount: number; 
 		logCallbackCount: number;
 		rawSessionCallbackCount: number;
 	} {
 		return {
 			isWatching: this.isWatchingEnabled,
-			sessionCallbackCount: this.sessionEventCallbacks.length,
 			logCallbackCount: this.logEventCallbacks.length,
 			rawSessionCallbackCount: this.rawSessionCallbacks.length
 		};
-	}
-
-	/**
-     * Force refresh current session events (useful for testing)
-     */
-	async refreshSessionEvents(): Promise<CopilotUsageEvent[]> {
-		return this.getSessionEvents(true);
 	}
 
 	/**
@@ -429,7 +309,6 @@ export class UnifiedSessionDataService {
      */
 	dispose(): void {
 		this.stopRealTimeUpdates();
-		this.sessionEventCallbacks = [];
 		this.logEventCallbacks = [];
 		this.rawSessionCallbacks = [];
 		this.sessionScanner.dispose();
