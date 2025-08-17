@@ -5,14 +5,14 @@
 
 import * as vscode from 'vscode';
 import { ForceFileWatcher } from '../util/force-file-watcher';
-import * as fs from 'fs/promises';
+import * as fsPromises from 'fs/promises';
+import type * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { 
 	CopilotChatSession, 
 	SessionScanResult, 
 	SessionScanStats, 
-	SessionWatcherOptions,
 	SESSION_SCAN_CONSTANTS 
 } from '../types/chat-session';
 import { ILogger } from '../types/logger';
@@ -23,6 +23,8 @@ export class ChatSessionScanner {
 	private watcherCallbacks: Array<(result: SessionScanResult) => void> = [];
 	private isWatching = false;
 	private lastUsedStoragePaths: string[] = [];
+	// Track last known file sizes to avoid re-parsing unchanged files
+	private fileSizes: Map<string, number> = new Map();
     
 	constructor(
 		private readonly storagePaths: string[],
@@ -63,10 +65,10 @@ export class ChatSessionScanner {
         
 		try {
 			// Check if storage path exists
-			await fs.access(storagePath);
+			await fsPromises.access(storagePath);
             
 			// Read workspace directories
-			const workspaceDirs = await fs.readdir(storagePath, { withFileTypes: true });
+			const workspaceDirs = await fsPromises.readdir(storagePath, { withFileTypes: true });
             
 			for (const workspaceDir of workspaceDirs) {
 				if (!workspaceDir.isDirectory()) {
@@ -76,7 +78,7 @@ export class ChatSessionScanner {
 				const chatSessionsPath = path.join(storagePath, workspaceDir.name, SESSION_SCAN_CONSTANTS.CHAT_SESSIONS_DIR);
                 
 				try {
-					await fs.access(chatSessionsPath);
+					await fsPromises.access(chatSessionsPath);
 					const sessionFiles_local = await this.scanChatSessionsDirectory(chatSessionsPath);
 					sessionFiles.push(...sessionFiles_local);
 				} catch {
@@ -99,7 +101,7 @@ export class ChatSessionScanner {
 		const sessionFiles: string[] = [];
         
 		try {
-			const files = await fs.readdir(chatSessionsPath);
+			const files = await fsPromises.readdir(chatSessionsPath);
             
 			for (const fileName of files) {
 				// Check if file matches session pattern
@@ -161,10 +163,10 @@ export class ChatSessionScanner {
 	private async parseSessionFile(filePath: string): Promise<SessionScanResult | null> {
 		try {
 			// Get file stats
-			const stats = await fs.stat(filePath);
+			const stats = await fsPromises.stat(filePath);
             
 			// Read and parse file content
-			const content = await fs.readFile(filePath, 'utf-8');
+			const content = await fsPromises.readFile(filePath, 'utf-8');
 			const rawSession = JSON.parse(content);
 			
 			// Map 'requests' field to 'turns' to match our interface
@@ -346,6 +348,19 @@ export class ChatSessionScanner {
 							this.logger.trace(`Ignoring irrelevant file change: ${uri.fsPath}`);
 							return;
 						}
+
+						// Fast-change detection: skip parse if file length hasn't changed
+						let stats: fs.Stats | undefined;
+						try {
+							stats = await fsPromises.stat(uri.fsPath);
+							const prevSize = this.fileSizes.get(uri.fsPath);
+							if (prevSize !== undefined && prevSize === stats.size) {
+								this.logger.trace(`Skipping unchanged session file (size=${stats.size}): ${uri.fsPath}`);
+								return;
+							}
+						} catch (e) {
+							this.logger.trace(`Stat failed for ${uri.fsPath}, proceeding to parse. Error: ${e}`);
+						}
 						
 						this.logger.trace(`${edition} session file change detected: ${uri.fsPath}`);
 						
@@ -353,6 +368,14 @@ export class ChatSessionScanner {
 						if (result) {
 							this.logger.debug(`File watcher parsed session change from ${edition}: ${result.session.sessionId}`);
 							this.watcherCallbacks.forEach(callback => callback(result));
+						}
+
+						// Update last known size after handling (even if parsing yielded null)
+						if (!stats) {
+							try { stats = await fsPromises.stat(uri.fsPath); } catch { /* ignore */ }
+						}
+						if (stats) {
+							this.fileSizes.set(uri.fsPath, stats.size);
 						}
 					} catch (error) {
 						this.logger.error(`Error handling ${edition} file change ${uri.fsPath}: ${error}`);
@@ -363,6 +386,8 @@ export class ChatSessionScanner {
 				watcher.onDidChange(handleFileChange);
 				watcher.onDidDelete((uri) => {
 					this.logger.debug(`${edition} session file deleted: ${uri.fsPath}`);
+					// Remove cached size to avoid stale state
+					this.fileSizes.delete(uri.fsPath);
 				});
 				
 				watcher.start();
@@ -566,8 +591,8 @@ export class ChatSessionScanner {
 
 		for (const storagePath of pathsToUse) {
 			try {
-				await fs.access(storagePath);
-				const workspaceDirs = await fs.readdir(storagePath, { withFileTypes: true });
+				await fsPromises.access(storagePath);
+				const workspaceDirs = await fsPromises.readdir(storagePath, { withFileTypes: true });
 				
 				for (const workspaceDir of workspaceDirs) {
 					if (!workspaceDir.isDirectory()) {
@@ -577,8 +602,8 @@ export class ChatSessionScanner {
 					const chatSessionsPath = path.join(storagePath, workspaceDir.name, SESSION_SCAN_CONSTANTS.CHAT_SESSIONS_DIR);
 					
 					try {
-						await fs.access(chatSessionsPath);
-						const sessionFiles = await fs.readdir(chatSessionsPath);
+						await fsPromises.access(chatSessionsPath);
+						const sessionFiles = await fsPromises.readdir(chatSessionsPath);
 						const jsonFiles = sessionFiles.filter(f => SESSION_SCAN_CONSTANTS.SESSION_FILE_PATTERN.test(f));
 						
 						workspaces.push({
