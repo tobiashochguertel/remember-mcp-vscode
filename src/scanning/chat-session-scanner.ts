@@ -170,7 +170,14 @@ export class ChatSessionScanner {
             
 			// Read and parse file content
 			const content = await fs.readFile(filePath, 'utf-8');
-			const session: CopilotChatSession = JSON.parse(content);
+			const rawSession = JSON.parse(content);
+			
+			// Map 'requests' field to 'turns' to match our interface
+			const session: CopilotChatSession = {
+				...rawSession,
+				turns: rawSession.requests || []
+			};
+			delete (session as any).requests; // Remove the original field
             
 			// Validate session structure
 			if (!this.isValidSession(session)) {
@@ -422,45 +429,45 @@ export class ChatSessionScanner {
 			return false;
 		}
         
-		if (!Array.isArray(obj.turns)) {
-			this.logger.trace(`Invalid turns: ${typeof obj.turns}`);
+		if (!Array.isArray(obj.requests)) {
+			this.logger.trace(`Invalid requests: ${typeof obj.requests}`);
 			return false;
 		}
         
-		// Check each turn structure
-		for (let i = 0; i < obj.turns.length; i++) {
-			const req = obj.turns[i];
-            
+		// Check each request structure
+		for (let i = 0; i < obj.requests.length; i++) {
+			const req = obj.requests[i];
+
 			if (!req) {
 				this.logger.trace(`Request ${i} is falsy`);
 				return false;
 			}
             
-			if (typeof req.turnId !== 'string') {
-				this.logger.trace(`Turn ${i} invalid turnId: ${typeof req.turnId}`);
+			if (typeof req.requestId !== 'string') {
+				this.logger.trace(`Request ${i} invalid requestId: ${typeof req.requestId}`);
 				return false;
 			}
             
 			if (typeof req.timestamp !== 'number') {
-				this.logger.trace(`Turn ${i} invalid timestamp: ${typeof req.timestamp}`);
+				this.logger.trace(`Request ${i} invalid timestamp: ${typeof req.timestamp}`);
 				return false;
 			}
             
 			// modelId is optional - many requests legitimately don't have it
 			if (req.modelId !== undefined && typeof req.modelId !== 'string') {
-				this.logger.trace(`Turn ${i} invalid modelId: ${typeof req.modelId}`);
+				this.logger.trace(`Request ${i} invalid modelId: ${typeof req.modelId}`);
 				return false;
 			}
             
 			if (!req.message || typeof req.message.text !== 'string') {
-				this.logger.trace(`Turn ${i} invalid message: ${!req.message ? 'missing' : typeof req.message.text}`);
+				this.logger.trace(`Request ${i} invalid message: ${!req.message ? 'missing' : typeof req.message.text}`);
 				return false;
 			}
             
 			// agent is optional - slash commands like /clear don't have an agent
 			if (req.agent !== undefined) {
 				if (typeof req.agent.id !== 'string') {
-					this.logger.trace(`Turn ${i} invalid agent.id: ${typeof req.agent.id}`);
+					this.logger.trace(`Request ${i} invalid agent.id: ${typeof req.agent.id}`);
 					return false;
 				}
 			}
@@ -468,7 +475,7 @@ export class ChatSessionScanner {
 			// Validate result.metadata.toolCallRounds if present (CRITICAL FOR NOT LOSING DATA)
 			if (req.result?.metadata?.toolCallRounds) {
 				if (!Array.isArray(req.result.metadata.toolCallRounds)) {
-					this.logger.trace(`Turn ${i} invalid toolCallRounds: not an array`);
+					this.logger.trace(`Request ${i} invalid toolCallRounds: not an array`);
 					return false;
 				}
                 
@@ -477,27 +484,27 @@ export class ChatSessionScanner {
 					const round = req.result.metadata.toolCallRounds[j];
                     
 					if (!round || typeof round !== 'object') {
-						this.logger.trace(`Turn ${i} toolCallRound ${j} invalid: not an object`);
+						this.logger.trace(`Request ${i} toolCallRound ${j} invalid: not an object`);
 						return false;
 					}
                     
 					if (typeof round.id !== 'string') {
-						this.logger.trace(`Turn ${i} toolCallRound ${j} invalid id: ${typeof round.id}`);
+						this.logger.trace(`Request ${i} toolCallRound ${j} invalid id: ${typeof round.id}`);
 						return false;
 					}
                     
 					if (typeof round.response !== 'string') {
-						this.logger.trace(`Turn ${i} toolCallRound ${j} invalid response: ${typeof round.response}`);
+						this.logger.trace(`Request ${i} toolCallRound ${j} invalid response: ${typeof round.response}`);
 						return false;
 					}
                     
 					if (!Array.isArray(round.toolCalls)) {
-						this.logger.trace(`Turn ${i} toolCallRound ${j} invalid toolCalls: ${typeof round.toolCalls}`);
+						this.logger.trace(`Request ${i} toolCallRound ${j} invalid toolCalls: ${typeof round.toolCalls}`);
 						return false;
 					}
                     
 					if (typeof round.toolInputRetry !== 'number') {
-						this.logger.trace(`Turn ${i} toolCallRound ${j} invalid toolInputRetry: ${typeof round.toolInputRetry}`);
+						this.logger.trace(`Request ${i} toolCallRound ${j} invalid toolInputRetry: ${typeof round.toolInputRetry}`);
 						return false;
 					}
                     
@@ -506,28 +513,28 @@ export class ChatSessionScanner {
 						const toolCall = round.toolCalls[k];
                         
 						if (!toolCall || typeof toolCall !== 'object') {
-							this.logger.trace(`Turn ${i} toolCallRound ${j} toolCall ${k} invalid: not an object`);
+							this.logger.trace(`Request ${i} toolCallRound ${j} toolCall ${k} invalid: not an object`);
 							return false;
 						}
                         
 						if (typeof toolCall.id !== 'string') {
-							this.logger.trace(`Turn ${i} toolCallRound ${j} toolCall ${k} invalid id: ${typeof toolCall.id}`);
+							this.logger.trace(`Request ${i} toolCallRound ${j} toolCall ${k} invalid id: ${typeof toolCall.id}`);
 							return false;
 						}
                         
 						if (typeof toolCall.name !== 'string') {
-							this.logger.trace(`Turn ${i} toolCallRound ${j} toolCall ${k} invalid name: ${typeof toolCall.name}`);
+							this.logger.trace(`Request ${i} toolCallRound ${j} toolCall ${k} invalid name: ${typeof toolCall.name}`);
 							return false;
 						}
                         
 						if (typeof toolCall.arguments !== 'string') {
-							this.logger.trace(`Turn ${i} toolCallRound ${j} toolCall ${k} invalid arguments: ${typeof toolCall.arguments}`);
+							this.logger.trace(`Request ${i} toolCallRound ${j} toolCall ${k} invalid arguments: ${typeof toolCall.arguments}`);
 							return false;
 						}
 					}
 				}
                 
-				this.logger.debug(`Turn ${i} has ${req.result.metadata.toolCallRounds.length} toolCallRounds - data preserved`);
+				this.logger.debug(`Request ${i} has ${req.result.metadata.toolCallRounds.length} toolCallRounds - data preserved`);
 			}
 		}
         
