@@ -7,6 +7,7 @@ import { KpiChipsView, KpiChipsRenderState } from './components/kpis/KpiChipsVie
 import { AgentsListView } from './components/agents/AgentsListView';
 import { ModelsListView } from './components/models/ModelsListView';
 import { ActivityFeedView } from './components/activity/ActivityFeedView';
+import { DailyRequestsChartView, DailyRequestsChartRenderState } from './components/charts/DailyRequestsChartView';
 
 /**
  * View for Copilot Usage History Panel
@@ -18,6 +19,7 @@ export class CopilotUsageHistoryView {
 	private readonly agentsListView: AgentsListView;
 	private readonly modelsListView: ModelsListView;
 	private readonly activityFeedView: ActivityFeedView;
+	private readonly dailyRequestsChartView: DailyRequestsChartView;
 
 	constructor(
 		private readonly _webview: vscode.Webview,
@@ -31,6 +33,7 @@ export class CopilotUsageHistoryView {
 		this.agentsListView = new AgentsListView();
 		this.modelsListView = new ModelsListView();
 		this.activityFeedView = new ActivityFeedView();
+		this.dailyRequestsChartView = new DailyRequestsChartView();
 
 		// Set up data binding: model changes update the view
 		this._model.onDataChanged(async () => {
@@ -100,6 +103,7 @@ export class CopilotUsageHistoryView {
 			
 			${this.generateFiltersSection()}
 			${this.generateKpiSection()}
+			${this.generateDailyRequestsChartSection()}
 			${this.generateAgentsSection()}
 			${this.generateModelsSection()}
 			${this.generateActivitySection()}
@@ -146,6 +150,22 @@ export class CopilotUsageHistoryView {
 		};
 		// Intentionally no heading for KPI chips (design choice)
 		return this.kpiChipsView.render(renderState);
+	}
+
+	/**
+	 * Generate daily requests chart section using DailyRequestsChartView component
+	 */
+	private generateDailyRequestsChartSection(): string {
+		const vm = this._model.dailyRequestsChartViewModel;
+		const vmState = vm.getState();
+		const chartData = vm.getChartData();
+		const renderState: DailyRequestsChartRenderState = {
+			labels: chartData.labels,
+			data: chartData.data,
+			isLoading: vmState.isLoading,
+			isEmpty: vmState.isEmpty
+		};
+		return this.dailyRequestsChartView.render(renderState);
 	}
 
 	/**

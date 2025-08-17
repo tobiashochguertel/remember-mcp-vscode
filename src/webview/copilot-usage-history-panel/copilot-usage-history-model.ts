@@ -6,6 +6,7 @@ import { KpiChipsViewModel } from './components/kpis/KpiChipsViewModel';
 import { AgentsListViewModel } from './components/agents/AgentsListViewModel';
 import { ModelsListViewModel } from './components/models/ModelsListViewModel';
 import { ActivityFeedViewModel } from './components/activity/ActivityFeedViewModel';
+import { DailyRequestsChartViewModel } from './components/charts/DailyRequestsChartViewModel';
 
 import { ILogger } from '../../types/logger';
 
@@ -88,6 +89,7 @@ export class CopilotUsageHistoryModel {
 	public agentsListViewModel!: AgentsListViewModel;
 	public modelsListViewModel!: ModelsListViewModel;
 	public activityFeedViewModel!: ActivityFeedViewModel;
+	public dailyRequestsChartViewModel!: DailyRequestsChartViewModel;
 
 	constructor(
 		private readonly extensionContext: vscode.ExtensionContext,
@@ -129,7 +131,8 @@ export class CopilotUsageHistoryModel {
 			this.agentsListViewModel = new AgentsListViewModel(this, this.analyticsService, this.logger);
 			this.modelsListViewModel = new ModelsListViewModel(this, this.analyticsService, this.logger);
 			this.activityFeedViewModel = new ActivityFeedViewModel(this, this.analyticsService, this.logger);
-			this.logger.trace('Initialized FiltersViewModel');
+			this.dailyRequestsChartViewModel = new DailyRequestsChartViewModel(this, this.analyticsService, this.logger);
+			this.logger.trace('Initialized component view-models');
 		} catch (error) {
 			this.logger.error('Failed to initialize component view-models', error);
 		}
@@ -194,6 +197,9 @@ export class CopilotUsageHistoryModel {
 		// Activity (simple load)
 		const activity = this.analyticsService.getActivity(filter, 100);
 		this.activityFeedViewModel?.applyActivity(activity);
+		// Daily requests chart (simple load)
+		const dailyRequests = this.analyticsService.getDailyRequests(filter);
+		this.dailyRequestsChartViewModel?.applyDailyRequests(dailyRequests);
 	}
 
 	/**
