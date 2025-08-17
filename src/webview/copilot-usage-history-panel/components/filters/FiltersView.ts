@@ -38,6 +38,7 @@ export class FiltersView implements ComponentView<FiltersState, FiltersActions> 
 		const modelOptions = (state.modelOptions || []).map((id: string) => `<option value="${id}" ${id===state.modelId?'selected':''}>${id}</option>`).join('');
 
 		return `
+			<section class="panel-section" aria-label="Filters">
 			<div class="filters" id="filters_bar">
 				<select id="flt_time" class="vscode-select">
 					${timeOptions.map(o => `<option value=\"${o.v}\" ${o.v===state.timeRange?'selected':''}>${o.l}</option>`).join('')}
@@ -55,6 +56,7 @@ export class FiltersView implements ComponentView<FiltersState, FiltersActions> 
 				</select>
 				<button id="flt_refresh" class="vscode-button">Refresh</button>
 			</div>
+			</section>
 		`;
 	}
 

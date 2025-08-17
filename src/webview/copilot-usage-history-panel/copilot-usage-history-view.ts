@@ -87,6 +87,7 @@ export class CopilotUsageHistoryView {
 		const chartJsUri = this.getChartJsUri();
 
 		const styles = await this.getWebviewStyles();
+		const sharedScript = WebviewUtils.getSharedScript();
 
 		return `<!DOCTYPE html>
 		<html lang="en">
@@ -96,11 +97,10 @@ export class CopilotUsageHistoryView {
 			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'unsafe-eval' vscode-resource:; font-src 'self' data:;">
 			<title>Copilot Usage History</title>
 			<script src="${chartJsUri}"></script>
+			${sharedScript}
 			${styles}
 		</head>
 		<body>
-			<h1>Copilot Usage History</h1>
-			
 			${this.generateFiltersSection()}
 			${this.generateKpiSection()}
 			${this.generateDailyRequestsChartSection()}

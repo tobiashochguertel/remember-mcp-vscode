@@ -26,12 +26,7 @@ export class ChatSessionScanner {
     
 	constructor(
 		private readonly storagePaths: string[],
-		private readonly logger: ILogger,
-		private readonly watcherOptions: SessionWatcherOptions = {
-			enableWatching: true,
-			debounceMs: SESSION_SCAN_CONSTANTS.DEFAULT_DEBOUNCE_MS,
-			maxRetries: SESSION_SCAN_CONSTANTS.DEFAULT_MAX_RETRIES
-		}
+		private readonly logger: ILogger
 	) {
 		this.lastUsedStoragePaths = [...storagePaths];
 	}
@@ -274,7 +269,7 @@ export class ChatSessionScanner {
      * Start watching for new/modified session files
      */
 	startWatching(callback: (result: SessionScanResult) => void): void {
-		if (!this.watcherOptions.enableWatching || this.isWatching) {
+		if (this.isWatching) {
 			return;
 		}
         
@@ -339,37 +334,29 @@ export class ChatSessionScanner {
 				
 				const watcher = new ForceFileWatcher(
 					pattern,
-					500,    // No forced flush needed for session files
-					500  // Heavy debouncing (500ms) - sessions update in bursts
+					0, // No forced flush needed for session files
+					SESSION_SCAN_CONSTANTS.DEFAULT_DEBOUNCE_MS // Use configured debounce from options
 				);
 				
-				// Debounced handler for file changes
-				let debounceTimer: NodeJS.Timeout | undefined;
-				
+				// File change handler; ForceFileWatcher already applies per-file debouncing
 				const handleFileChange = async (uri: vscode.Uri) => {
-					if (debounceTimer) {
-						clearTimeout(debounceTimer);
-					}
-					
-					debounceTimer = setTimeout(async () => {
-						try {
-							// Verify this is a session file we care about
-							if (!uri.fsPath.includes('chatSessions') || !uri.fsPath.endsWith('.json')) {
-								this.logger.trace(`Ignoring irrelevant file change: ${uri.fsPath}`);
-								return;
-							}
-							
-							this.logger.trace(`${edition} session file change detected: ${uri.fsPath}`);
-							
-							const result = await this.parseSessionFile(uri.fsPath);
-							if (result) {
-								this.logger.debug(`File watcher parsed session change from ${edition}: ${result.session.sessionId}`);
-								this.watcherCallbacks.forEach(callback => callback(result));
-							}
-						} catch (error) {
-							this.logger.error(`Error handling ${edition} file change ${uri.fsPath}: ${error}`);
+					try {
+						// Verify this is a session file we care about
+						if (!uri.fsPath.includes('chatSessions') || !uri.fsPath.endsWith('.json')) {
+							this.logger.trace(`Ignoring irrelevant file change: ${uri.fsPath}`);
+							return;
 						}
-					}, this.watcherOptions.debounceMs);
+						
+						this.logger.trace(`${edition} session file change detected: ${uri.fsPath}`);
+						
+						const result = await this.parseSessionFile(uri.fsPath);
+						if (result) {
+							this.logger.debug(`File watcher parsed session change from ${edition}: ${result.session.sessionId}`);
+							this.watcherCallbacks.forEach(callback => callback(result));
+						}
+					} catch (error) {
+						this.logger.error(`Error handling ${edition} file change ${uri.fsPath}: ${error}`);
+					}
 				};
 				
 				watcher.onDidCreate(handleFileChange);

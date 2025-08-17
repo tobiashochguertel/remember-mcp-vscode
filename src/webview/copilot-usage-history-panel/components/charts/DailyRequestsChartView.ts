@@ -5,6 +5,14 @@ export interface DailyRequestsChartRenderState {
 	data: number[];
 	isLoading: boolean;
 	isEmpty: boolean;
+	/** Optional section title; defaults to "Daily Requests" */
+	title?: string;
+	/** Optional dataset/series label; defaults to "Requests" */
+	seriesLabel?: string;
+	/** Optional loading text; defaults to "Loading chart..." */
+	loadingText?: string;
+	/** Optional empty state text; defaults to "No data available" */
+	emptyText?: string;
 }
 
 /**
@@ -16,9 +24,9 @@ export class DailyRequestsChartView implements ComponentView<DailyRequestsChartR
 		if (state.isLoading) {
 			return `
 				<section class="daily-requests-chart">
-					<h4>Daily Requests</h4>
+					<h4>${state.title ?? 'Daily Requests'}</h4>
 					<div class="chart-container" style="position: relative; height: 200px; text-align: center; display: flex; align-items: center; justify-content: center;">
-						<div style="color: var(--vscode-descriptionForeground);">Loading chart...</div>
+						<div style="color: var(--vscode-descriptionForeground);">${state.loadingText ?? 'Loading chart...'}</div>
 					</div>
 				</section>
 			`;
@@ -27,9 +35,9 @@ export class DailyRequestsChartView implements ComponentView<DailyRequestsChartR
 		if (state.isEmpty) {
 			return `
 				<section class="daily-requests-chart">
-					<h4>Daily Requests</h4>
+					<h4>${state.title ?? 'Daily Requests'}</h4>
 					<div class="chart-container" style="position: relative; height: 200px; text-align: center; display: flex; align-items: center; justify-content: center;">
-						<div style="color: var(--vscode-descriptionForeground);">No data available</div>
+						<div style="color: var(--vscode-descriptionForeground);">${state.emptyText ?? 'No data available'}</div>
 					</div>
 				</section>
 			`;
@@ -44,7 +52,7 @@ export class DailyRequestsChartView implements ComponentView<DailyRequestsChartR
 				labels: state.labels,
 				datasets: [
 					{
-						label: 'Requests',
+						label: state.seriesLabel ?? 'Requests',
 						data: state.data,
 						backgroundColor: datasetColorToken,
 						borderColor: datasetColorToken,
@@ -69,15 +77,7 @@ export class DailyRequestsChartView implements ComponentView<DailyRequestsChartR
 						borderColor: 'var(--vscode-editorHoverWidget-border)',
 						borderWidth: 1,
 						titleColor: 'var(--vscode-editorHoverWidget-foreground)',
-						bodyColor: 'var(--vscode-editorHoverWidget-foreground)',
-						callbacks: {
-							title: function (context: any[]) { 
-								return context[0].label; 
-							},
-							label: function (context: any) { 
-								const v = context.parsed.y; return 'Requests: ' + v; 
-							}
-						}
+						bodyColor: 'var(--vscode-editorHoverWidget-foreground)'
 					}
 				},
 				scales: {
@@ -114,95 +114,39 @@ export class DailyRequestsChartView implements ComponentView<DailyRequestsChartR
 		};
 
 		return `
-			<section class="daily-requests-chart">
-				<h4>Daily Requests</h4>
-				<div class="chart-container" style="
-					position: relative; 
-					height: 200px; 
-					margin: 8px 0; 
-					padding: 8px;
-					background-color: var(--vscode-panel-background);
-					border: 1px solid var(--vscode-panel-border);
-					border-radius: 4px;
-				">
+			<section class="daily-requests-chart panel-section">
+				<h4>${state.title ?? 'Daily Requests'}</h4>
+				<div class="chart-container panel-section" style="height: 200px; position: relative;">
 					<canvas id="${canvasId}"></canvas>
 				</div>
 				<script>
 					(function() {
-						const init = () => {
-							if (typeof Chart === 'undefined') {
-								setTimeout(init, 100);
-								return;
-							}
-
+						// Build and render this specific chart using the shared helper
+						const boot = () => {
 							const canvas = document.getElementById('${canvasId}');
-							if (!canvas) {
-								return;
-							}
-
-							// Manage chart instance per-canvas to avoid cross-chart interference
-							const charts = (window.__charts = window.__charts || {});
-							const instanceKey = canvas.id;
-							if (charts[instanceKey]) {
-								charts[instanceKey].destroy();
-							}
-
-							function resolveVarViaCanvas(value) {
-								if (typeof value !== 'string') return value;
-								if (value.indexOf('var(') === -1) return value;
-								const prevColor = canvas.style.color;
-								canvas.style.color = value;
-								let resolved = getComputedStyle(canvas).color;
-								canvas.style.color = prevColor;
-								if (resolved && resolved.trim() && resolved.indexOf('var(') === -1) return resolved;
-								const prevFont = canvas.style.fontFamily;
-								canvas.style.fontFamily = value;
-								resolved = getComputedStyle(canvas).fontFamily;
-								canvas.style.fontFamily = prevFont;
-								return (resolved && resolved.trim() && resolved.indexOf('var(') === -1) ? resolved : value;
-							}
-
-							function deepReplaceCssVars(input) {
-								if (input == null) return input;
-								const t = typeof input;
-								if (t === 'string') {
-									return resolveVarViaCanvas(input);
-								}
-								if (Array.isArray(input)) {
-									for (let i = 0; i < input.length; i++) {
-										input[i] = deepReplaceCssVars(input[i]);
-									}
-									return input;
-								}
-								if (t === 'object') {
-									for (const k in input) {
-										if (!Object.prototype.hasOwnProperty.call(input, k)) continue;
-										const v = input[k];
-										if (typeof v === 'function') continue;
-										input[k] = deepReplaceCssVars(v);
-									}
-								}
-								return input;
-							}
+							if (!canvas) return;
 
 							const config = ${JSON.stringify(chartConfig)};
-							if (config && config.options && config.options.plugins && config.options.plugins.tooltip) {
-								config.options.plugins.tooltip.callbacks = {
-									title: function(context) { return context[0].label; },
-									label: function(context) { const v = context.parsed.y; return 'Requests: ' + v; }
-								};
-							}
 
-							const resolvedConfig = deepReplaceCssVars(config);
-
-							try {
-								charts[instanceKey] = new Chart(canvas, resolvedConfig);
-							} catch (error) {
-								console.error('Failed to create daily requests chart:', error);
+							if (window.__chartKit) {
+								window.__chartKit.render(canvas, config);
+							} else {
+								// Fallback wait until shared script loads
+								const wait = setInterval(() => {
+									if (window.__chartKit) {
+										clearInterval(wait);
+										window.__chartKit.render(canvas, config);
+									}
+								}, 50);
 							}
 						};
 
-						init();
+						// If Chart.js may not be ready yet, utilize helper's whenChartReady when present
+						if (window.__chartKit && window.__chartKit.whenChartReady) {
+							window.__chartKit.whenChartReady(boot);
+						} else {
+							boot();
+						}
 					})();
 				</script>
 			</section>

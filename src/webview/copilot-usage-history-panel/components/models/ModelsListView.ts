@@ -14,10 +14,10 @@ export interface ModelsListState {
 export class ModelsListView implements ComponentView<ModelsListState, never> {
 	render(state: ModelsListState): string {
 		if (!state.items.length) {
-			return '<section class="models"><h4>Models</h4><div class="empty">No data</div></section>';
+			return '<section class="models panel-section"><h4>Models</h4><div class="empty">No data</div></section>';
 		}
 		return `
-			<section class="models">
+			<section class="models panel-section">
 				<h4>Models</h4>
 				<table class="table">
 					<thead>

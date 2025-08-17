@@ -161,12 +161,6 @@ export interface SessionScanStats {
 	newestSession?: string;
 }
 
-export interface SessionWatcherOptions {
-	enableWatching: boolean;
-	debounceMs: number;
-	maxRetries: number;
-}
-
 export interface SessionMetadata {
 	sessionId: string;
 	workspaceHash: string;
@@ -198,7 +192,7 @@ export const SESSION_SCAN_CONSTANTS = {
 	SESSION_FILE_PATTERN: /^[a-f0-9-]+\.json$/,
         
 	// Debounce settings
-	DEFAULT_DEBOUNCE_MS: 500,
+	DEFAULT_DEBOUNCE_MS: 1000,
     
 	// Retry settings
 	DEFAULT_MAX_RETRIES: 3

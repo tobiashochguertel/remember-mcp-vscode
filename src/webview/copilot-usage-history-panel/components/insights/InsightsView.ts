@@ -15,7 +15,7 @@ export class InsightsView implements ComponentView<InsightsState, never> {
 			return '';
 		}
 		return `
-			<section class="insights">
+			<section class="insights panel-section">
 				<h4>Insights</h4>
 				<ul class="insight-list">
 					${state.items.slice(0, 3).map(i => `<li>${i.text}</li>`).join('')}

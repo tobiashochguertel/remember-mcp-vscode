@@ -18,7 +18,7 @@ export interface ActivityFeedState {
 export class ActivityFeedView implements ComponentView<ActivityFeedState, never> {
 	render(state: ActivityFeedState): string {
 		if (!state.items.length) {
-			return '<section class="activity"><h4>Activity</h4><div class="empty">No recent activity</div></section>';
+			return '<section class="activity panel-section"><h4>Activity</h4><div class="empty">No recent activity</div></section>';
 		}
 
 		// Lightweight formatting: '2025-08-14T11:21:23.487Z' -> '2025-08-14 11:21:23'
@@ -33,7 +33,7 @@ export class ActivityFeedView implements ComponentView<ActivityFeedState, never>
 			return iso.replace('T',' ').replace(/\.[0-9]{3}Z$/, '').replace(/Z$/,'');
 		};
 		return `
-			<section class="activity">
+			<section class="activity panel-section">
 				<h4>Activity</h4>
 				<table class="table">
 					<thead>

@@ -10,6 +10,55 @@ body {
     padding: 8px;
 }
 
+/* Generic section wrapper used by all components */
+.panel-section {
+    position: relative;
+    margin: 8px 0;
+    padding: 0px;
+    background-color: var(--vscode-panel-background);
+    border: 0px solid var(--vscode-panel-border);
+    border-radius: 0px;
+}
+
+/* Optional utility for visually hidden headings/labels */
+.sr-only {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+/* KPI chips layout */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 1px;
+}
+
+.kpi-chip {
+    background-color: var(--vscode-panel-background);
+    border: 1px solid var(--vscode-panel-border);
+    padding: 8px;
+    text-align: left;
+}
+
+.kpi-chip .label {
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    margin-bottom: 2px;
+}
+
+.kpi-chip .value {
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--vscode-foreground);
+}
+
 h1, h2, h3 {
     margin: 0 0 8px 0;
     font-size: 13px;

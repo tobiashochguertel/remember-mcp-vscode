@@ -99,7 +99,7 @@ export class GlobalLogScanner {
 			return;
 		}
 
-		await this.setupGlobalFileWatchers();
+		//await this.setupGlobalFileWatchers();
 	}
 
 	/**
