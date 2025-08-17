@@ -36,93 +36,82 @@ export class DailyRequestsChartView implements ComponentView<DailyRequestsChartR
 		}
 
 		const canvasId = 'dailyRequestsChart';
-		
-		// Prepare data for Chart.js
-		const chartData = JSON.stringify({
-			labels: state.labels,
-			datasets: [{
-				label: 'Requests',
-				data: state.data,
-				backgroundColor: 'rgba(14, 99, 156, 0.8)', // button.background
-				borderColor: 'rgba(7, 9, 11, 1)', // VS Code blue
-				borderWidth: 1,
-				borderRadius: 2,
-				borderSkipped: false,
-				hoverBackgroundColor: 'rgba(14, 99, 156, 0.9)',
-				hoverBorderColor: 'rgba(14, 99, 156, 1)',
-				hoverBorderWidth: 2
-			}]
-		});
-
-		const chartOptions = JSON.stringify({
-			responsive: true,
-			maintainAspectRatio: false,
-			plugins: {
-				legend: {
-					display: false
-				},
-				tooltip: {
-					mode: 'index',
-					intersect: false,
-					backgroundColor: 'var(--vscode-editorHoverWidget-background)',
-					borderColor: 'var(--vscode-editorHoverWidget-border)',
-					borderWidth: 1,
-					titleColor: 'var(--vscode-editorHoverWidget-foreground)',
-					bodyColor: 'var(--vscode-editorHoverWidget-foreground)',
-					callbacks: {
-						title: function(context: any) {
-							return context[0].label;
-						},
-						label: function(context: any) {
-							const value = context.parsed.y;
-							return `Requests: ${value}`;
+		// Build chart config in TypeScript (use CSS var tokens; they'll be resolved in the webview)
+		const datasetColorToken = 'var(--vscode-charts-blue)';
+		const chartConfig = {
+			type: 'bar',
+			data: {
+				labels: state.labels,
+				datasets: [
+					{
+						label: 'Requests',
+						data: state.data,
+						backgroundColor: datasetColorToken,
+						borderColor: datasetColorToken,
+						borderWidth: 1,
+						borderRadius: 2,
+						borderSkipped: false,
+						hoverBackgroundColor: datasetColorToken,
+						hoverBorderColor: datasetColorToken,
+						hoverBorderWidth: 2
+					}
+				]
+			},
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				plugins: {
+					legend: { display: false },
+					tooltip: {
+						mode: 'index',
+						intersect: false,
+						backgroundColor: 'var(--vscode-editorHoverWidget-background)',
+						borderColor: 'var(--vscode-editorHoverWidget-border)',
+						borderWidth: 1,
+						titleColor: 'var(--vscode-editorHoverWidget-foreground)',
+						bodyColor: 'var(--vscode-editorHoverWidget-foreground)',
+						callbacks: {
+							title: function (context: any[]) { 
+								return context[0].label; 
+							},
+							label: function (context: any) { 
+								const v = context.parsed.y; return 'Requests: ' + v; 
+							}
 						}
 					}
-				}
-			},
-			scales: {
-				x: {
-					display: true,
-					grid: {
-						display: false
+				},
+				scales: {
+					x: {
+						display: true,
+						grid: { display: false },
+						ticks: { color: 'var(--vscode-foreground)', 
+							maxRotation: 45, 
+							minRotation: 0, 
+							font: { 
+								size: 11, 
+								family: 'var(--vscode-font-family)' 
+							}
+						}
 					},
-					ticks: {
-						color: 'var(--vscode-foreground)',
-						font: {
-							size: 11,
-							family: 'var(--vscode-font-family)'
-						},
-						maxRotation: 45,
-						minRotation: 0
+					y: { 
+						display: true, 
+						beginAtZero: true,
+						grid: { 
+							color: 'var(--vscode-panel-border)', 
+							borderDash: [2, 2] }, 
+						ticks: { color: 'var(--vscode-foreground)', 
+							precision: 0, 
+							font: { 
+								size: 11,
+								family: 'var(--vscode-font-family)'
+							} 
+						}
 					}
 				},
-				y: {
-					display: true,
-					beginAtZero: true,
-					grid: {
-						color: 'var(--vscode-panel-border)',
-						borderDash: [2, 2]
-					},
-					ticks: {
-						color: 'var(--vscode-foreground)',
-						font: {
-							size: 11,
-							family: 'var(--vscode-font-family)'
-						},
-						precision: 0
-					}
-				}
-			},
-			interaction: {
-				mode: 'nearest',
-				axis: 'x',
-				intersect: false
-			},
-			animation: {
-				duration: 750,
-				easing: 'easeInOutQuart'
+				interaction: { mode: 'nearest', axis: 'x', intersect: false },
+				animation: { duration: 750, easing: 'easeInOutQuart' }
 			}
-		});
+		};
 
 		return `
 			<section class="daily-requests-chart">
@@ -140,40 +129,80 @@ export class DailyRequestsChartView implements ComponentView<DailyRequestsChartR
 				</div>
 				<script>
 					(function() {
-						// Wait for Chart.js to be available
-						if (typeof Chart === 'undefined') {
-							console.warn('Chart.js not loaded yet, retrying...');
-							setTimeout(arguments.callee, 100);
-							return;
-						}
+						const init = () => {
+							if (typeof Chart === 'undefined') {
+								setTimeout(init, 100);
+								return;
+							}
 
-						const ctx = document.getElementById('${canvasId}');
-						if (!ctx) {
-							console.warn('Canvas element not found: ${canvasId}');
-							return;
-						}
+							const canvas = document.getElementById('${canvasId}');
+							if (!canvas) {
+								return;
+							}
 
-						// Destroy existing chart if it exists
-						if (window.dailyRequestsChartInstance) {
-							window.dailyRequestsChartInstance.destroy();
-						}
+							// Manage chart instance per-canvas to avoid cross-chart interference
+							const charts = (window.__charts = window.__charts || {});
+							const instanceKey = canvas.id;
+							if (charts[instanceKey]) {
+								charts[instanceKey].destroy();
+							}
 
-						// Get computed styles for dynamic theming
-						const computedStyle = getComputedStyle(document.body);
-						const foregroundColor = computedStyle.getPropertyValue('--vscode-foreground').trim();
-						const borderColor = computedStyle.getPropertyValue('--vscode-panel-border').trim();
-						const chartAccentColor = computedStyle.getPropertyValue('--vscode-charts-blue') || 'rgba(0, 122, 204, 1)';
+							function resolveVarViaCanvas(value) {
+								if (typeof value !== 'string') return value;
+								if (value.indexOf('var(') === -1) return value;
+								const prevColor = canvas.style.color;
+								canvas.style.color = value;
+								let resolved = getComputedStyle(canvas).color;
+								canvas.style.color = prevColor;
+								if (resolved && resolved.trim() && resolved.indexOf('var(') === -1) return resolved;
+								const prevFont = canvas.style.fontFamily;
+								canvas.style.fontFamily = value;
+								resolved = getComputedStyle(canvas).fontFamily;
+								canvas.style.fontFamily = prevFont;
+								return (resolved && resolved.trim() && resolved.indexOf('var(') === -1) ? resolved : value;
+							}
 
-						// Create new chart
-						try {
-							window.dailyRequestsChartInstance = new Chart(ctx, {
-								type: 'bar',
-								data: ${chartData},
-								options: ${chartOptions}
-							});
-						} catch (error) {
-							console.error('Failed to create daily requests chart:', error);
-						}
+							function deepReplaceCssVars(input) {
+								if (input == null) return input;
+								const t = typeof input;
+								if (t === 'string') {
+									return resolveVarViaCanvas(input);
+								}
+								if (Array.isArray(input)) {
+									for (let i = 0; i < input.length; i++) {
+										input[i] = deepReplaceCssVars(input[i]);
+									}
+									return input;
+								}
+								if (t === 'object') {
+									for (const k in input) {
+										if (!Object.prototype.hasOwnProperty.call(input, k)) continue;
+										const v = input[k];
+										if (typeof v === 'function') continue;
+										input[k] = deepReplaceCssVars(v);
+									}
+								}
+								return input;
+							}
+
+							const config = ${JSON.stringify(chartConfig)};
+							if (config && config.options && config.options.plugins && config.options.plugins.tooltip) {
+								config.options.plugins.tooltip.callbacks = {
+									title: function(context) { return context[0].label; },
+									label: function(context) { const v = context.parsed.y; return 'Requests: ' + v; }
+								};
+							}
+
+							const resolvedConfig = deepReplaceCssVars(config);
+
+							try {
+								charts[instanceKey] = new Chart(canvas, resolvedConfig);
+							} catch (error) {
+								console.error('Failed to create daily requests chart:', error);
+							}
+						};
+
+						init();
 					})();
 				</script>
 			</section>
