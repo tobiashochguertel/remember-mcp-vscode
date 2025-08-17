@@ -1,6 +1,5 @@
 /**
  * Copilot Usage History Panel using MVVM architecture with micro-view-models
- * Refactored to follow the same pattern as CopilotUsagePanel
  */
 
 import * as vscode from 'vscode';
@@ -192,9 +191,8 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 	public async scanChatSessions(): Promise<void> {
 		if (!this._model) { return; }
 
-		// No-op: scanning is not required anymore. Analytics pulls from raw session data automatically.
-		this.logger.info('scanChatSessions is a no-op; analytics uses raw session data and auto-refreshes.');
-		vscode.window.showInformationMessage('Scan chat sessions is currently a no-op. Data updates automatically from raw session history.');
+		this.logger.info('scanChatSessions is not required; analytics uses raw session data and auto-refreshes.');
+		vscode.window.showInformationMessage('Scan chat sessions is not required. Data updates automatically from raw session history.');
 	}
 
 	/**

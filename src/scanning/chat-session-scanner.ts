@@ -18,8 +18,8 @@ import {
 import { ILogger } from '../types/logger';
 
 export class ChatSessionScanner {
-	private fileWatcher?: ForceFileWatcher; // Legacy single watcher (kept for backward compatibility)
-	private sessionWatchers: ForceFileWatcher[] = []; // Multiple watchers for multi-edition support
+	private fileWatcher?: ForceFileWatcher;
+	private sessionWatchers: ForceFileWatcher[] = [];
 	private watcherCallbacks: Array<(result: SessionScanResult) => void> = [];
 	private isWatching = false;
 	private lastUsedStoragePaths: string[] = [];
@@ -159,7 +159,7 @@ export class ChatSessionScanner {
 	/**
      * Parse a single session file and return structured data
      */
-	async parseSessionFile(filePath: string): Promise<SessionScanResult | null> {
+	private async parseSessionFile(filePath: string): Promise<SessionScanResult | null> {
 		try {
 			// Get file stats
 			const stats = await fs.stat(filePath);
@@ -287,7 +287,6 @@ export class ChatSessionScanner {
         
 		this.watcherCallbacks = [];
         
-		// Cleanup legacy single watcher
 		if (this.fileWatcher) {
 			this.fileWatcher.dispose();
 			this.fileWatcher = undefined;
@@ -534,7 +533,7 @@ export class ChatSessionScanner {
 	/**
      * Get scanner statistics
      */
-	getWatcherStatus(): { 
+	private getWatcherStatus(): { 
 		isWatching: boolean; 
 		callbackCount: number; 
 		watcherCount: number;
@@ -555,14 +554,14 @@ export class ChatSessionScanner {
 	/**
      * Get the storage paths that were last used for scanning
      */
-	getLastUsedStoragePaths(): string[] {
+	private getLastUsedStoragePaths(): string[] {
 		return [...this.lastUsedStoragePaths];
 	}
 
 	/**
      * Get detailed information about discovered workspaces and session counts
      */
-	async getWorkspaceInfo(storagePaths?: string[]): Promise<{ workspaces: any[]; totalSessions: number }> {
+	private async getWorkspaceInfo(storagePaths?: string[]): Promise<{ workspaces: any[]; totalSessions: number }> {
 		const pathsToUse = storagePaths || this.lastUsedStoragePaths;
 		const workspaces: any[] = [];
 		let totalSessions = 0;

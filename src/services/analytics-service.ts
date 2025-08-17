@@ -133,7 +133,7 @@ export class AnalyticsService {
 		return stats.slice(0, limit);
 	}
 
-	getLanguages(filter?: AnalyticsFilter, limit = 10): LanguageStat[] {
+	private getLanguages(filter?: AnalyticsFilter, limit = 10): LanguageStat[] {
 		const reqs = this.applyFilterToRequests(this.flattenRequests(), filter);
 		const byLang = new Map<string, number>();
 		for (const r of reqs) {
@@ -164,7 +164,7 @@ export class AnalyticsService {
 		return items;
 	}
 
-	exportCsvs(): { files: Array<{ name: string; content: string }> } {
+	private exportCsvs(): { files: Array<{ name: string; content: string }> } {
 		const kpis = this.getKpis();
 		const agents = this.getAgents(undefined, 100);
 		const models = this.getModels(undefined, 100);
@@ -353,7 +353,7 @@ export class AnalyticsService {
 
 	private async refreshFromUnifiedService(full: boolean): Promise<void> {
 		try {
-			const results = await this.unified.getRawSessionResults(!!full);
+			const results = await this.unified.getRawSessionResults();
 			if (full) {
 				this.rawSessions = results.slice();
 				this.rawSessions.sort((a, b) => new Date(a.session.creationDate).getTime() - new Date(b.session.creationDate).getTime());

@@ -7,28 +7,25 @@
 
 import { Mutex } from 'async-mutex';
 import { ChatSessionScanner } from '../scanning/chat-session-scanner';
-// Switched from CopilotLogScanner to GlobalLogScanner for unified log monitoring
 import { GlobalLogScanner } from '../scanning/global-log-scanner';
 import { LogEntry } from '../scanning/log-types';
 import { SessionScanResult, SessionScanStats } from '../types/chat-session';
-// Removed debug unified counts feature; edit state scanner still optionally injected but no public debug method now.
 import { ILogger } from '../types/logger';
 
 export interface SessionDataServiceOptions {
 	enableRealTimeUpdates?: boolean;
 	debounceMs?: number;
 	// Backward/forward compatibility: some callers may still specify window log scanning toggle
-	enableWindowLogScanning?: boolean; // deprecated/no-op for now
+	enableWindowLogScanning?: boolean;
 }
 
 export class UnifiedSessionDataService {
 	private isWatchingEnabled = false;
 	private isInitialized = false;
 
-	// Public access to scanners (injected dependencies)
-	public get chatSessionScanner(): ChatSessionScanner { return this.sessionScanner; }
-	// Access to global log scanner (replaces former copilotLogScanner)
-	public get globalLogScanner(): GlobalLogScanner | undefined { return this.logScanner; }
+	// Access to scanners (internal)
+	private get chatSessionScanner(): ChatSessionScanner { return this.sessionScanner; }
+	private get globalLogScanner(): GlobalLogScanner | undefined { return this.logScanner; }
     
 	// Mutexes to prevent race conditions
 	private initializationMutex = new Mutex();
@@ -48,7 +45,7 @@ export class UnifiedSessionDataService {
 	private currentScanPromise?: Promise<{ results: SessionScanResult[]; logEntries: LogEntry[]; stats: SessionScanStats }>;
 
 	/** Indicates whether historical global logs were loaded into cache */
-	isHistoricalLogsLoaded(): boolean { return this.historicalLogsLoaded; }
+	private isHistoricalLogsLoaded(): boolean { return this.historicalLogsLoaded; }
 
 	constructor(
 		private readonly sessionScanner: ChatSessionScanner,
@@ -99,7 +96,7 @@ export class UnifiedSessionDataService {
      * Scan all session files and log files separately
      * Protected against concurrent scans with mutex
      */
-	async scanAllData(): Promise<{ results: SessionScanResult[]; logEntries: LogEntry[]; stats: SessionScanStats }> {
+	private async scanAllData(): Promise<{ results: SessionScanResult[]; logEntries: LogEntry[]; stats: SessionScanStats }> {
 		// If a scan is already in flight, return its promise (single-flight behavior)
 		if (this.currentScanPromise) {
 			return this.currentScanPromise;
@@ -130,12 +127,12 @@ export class UnifiedSessionDataService {
 	}
 
 	/**
-     * Get current raw session scan results (untampered session data with toolCallRounds)
-     */
-	async getRawSessionResults(forceRefresh = false): Promise<SessionScanResult[]> {
-		if (forceRefresh || this.cachedRawSessionResults.length === 0) {
-			const { results } = await this.sessionScanner.scanAllSessions();
-			this.cachedRawSessionResults = results;
+	 * Get current raw session scan results (untampered session data with toolCallRounds)
+	 * Performs a full scan only if the cache is empty; otherwise returns cached results.
+	 */
+	async getRawSessionResults(): Promise<SessionScanResult[]> {
+		if (this.cachedRawSessionResults.length === 0) {
+			const { results } = await this.scanAllData();
 			return results;
 		}
 		return this.cachedRawSessionResults;
@@ -144,7 +141,7 @@ export class UnifiedSessionDataService {
 	/**
      * Get last scan statistics
      */
-	getLastScanStats(): SessionScanStats | undefined {
+	private getLastScanStats(): SessionScanStats | undefined {
 		return this.lastScanStats;
 	}
 
@@ -152,7 +149,7 @@ export class UnifiedSessionDataService {
 	/**
      * Subscribe to log entry updates (real-time request-level data)
      */
-	onLogEntriesUpdated(callback: (entries: LogEntry[]) => void): void {
+	private onLogEntriesUpdated(callback: (entries: LogEntry[]) => void): void {
 		this.logEventCallbacks.push(callback);
 		this.logger.trace(`Log callback added - now have ${this.logEventCallbacks.length} callbacks`);
 	}
@@ -168,7 +165,7 @@ export class UnifiedSessionDataService {
 	/**
      * Remove log entry callback
      */
-	removeLogEventCallback(callback: (entries: LogEntry[]) => void): void {
+	private removeLogEventCallback(callback: (entries: LogEntry[]) => void): void {
 		const index = this.logEventCallbacks.indexOf(callback);
 		if (index > -1) {
 			this.logEventCallbacks.splice(index, 1);
@@ -276,7 +273,7 @@ export class UnifiedSessionDataService {
 	/**
      * Stop real-time monitoring
      */
-	stopRealTimeUpdates(): void {
+	private stopRealTimeUpdates(): void {
 		if (!this.isWatchingEnabled) {
 			return;
 		}
@@ -292,7 +289,7 @@ export class UnifiedSessionDataService {
 	/**
      * Get watcher status
      */
-	getWatcherStatus(): { 
+	private getWatcherStatus(): { 
 		isWatching: boolean; 
 		logCallbackCount: number;
 		rawSessionCallbackCount: number;
@@ -323,7 +320,7 @@ export class UnifiedSessionDataService {
      * Reset initialization state (for testing/debugging)
      * Protected against race conditions with mutex
      */
-	async resetInitialization(): Promise<void> {
+	private async resetInitialization(): Promise<void> {
 		await this.initializationMutex.runExclusive(async () => {
 			this.isInitialized = false;
 			this.stopRealTimeUpdates();

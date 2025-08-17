@@ -10,7 +10,6 @@ import { ILogger } from './logger';
 import { UnifiedSessionDataService, SessionDataServiceOptions } from '../services/unified-session-data-service';
 import { AnalyticsService } from '../services/analytics-service';
 import { ChatSessionScanner } from '../scanning/chat-session-scanner';
-// Switched to GlobalLogScanner for unified monitoring across instances
 import { GlobalLogScanner } from '../scanning/global-log-scanner';
 import { SESSION_SCAN_CONSTANTS } from './chat-session';
 

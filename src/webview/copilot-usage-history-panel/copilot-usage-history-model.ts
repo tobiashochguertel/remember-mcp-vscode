@@ -8,7 +8,6 @@ import { ModelsListViewModel } from './components/models/ModelsListViewModel';
 import { ActivityFeedViewModel } from './components/activity/ActivityFeedViewModel';
 
 import { ILogger } from '../../types/logger';
-// Legacy micro-view-model types removed
 
 /**
  * Model for Copilot Usage History Panel
@@ -16,7 +15,6 @@ import { ILogger } from '../../types/logger';
  */
 export class CopilotUsageHistoryModel {
 	private _listeners: Array<() => void> = [];
-	// Real-time callbacks removed; panel refreshes on-demand via analytics
 	private _errorMessage: string | undefined;
 	private _isScanning: boolean = false;
 
@@ -85,7 +83,6 @@ export class CopilotUsageHistoryModel {
 		}
 	}
 
-	// Legacy micro-view-models removed (summary, storage, global state)
 	// New component view-models (component architecture)
 	public filtersViewModel!: FiltersViewModel;
 	public kpiChipsViewModel!: KpiChipsViewModel;
@@ -116,8 +113,6 @@ export class CopilotUsageHistoryModel {
 			this.setGlobalError(String(error));
 		});
 	}
-
-	// Legacy initializeMicroViewModels() removed
 
 	/**
 	 * Initialize new component-based view-models (component architecture migration)
@@ -240,13 +235,12 @@ export class CopilotUsageHistoryModel {
 		await this.refreshAllData();
 	}
 
-	// Legacy clearData removed (no micro-view global state)
 
 	/**
 	 * Export usage data
 	 */
 	public async getExportData(): Promise<any> {
-		// No-op placeholder; export functionality will be implemented later
+	// Export functionality will be implemented later
 		return {
 			metadata: {
 				exportedAt: new Date().toISOString(),
@@ -294,7 +288,6 @@ export class CopilotUsageHistoryModel {
 		await this.extensionContext.globalState.update(key, { ...current, ...update });
 	}
 
-	// Legacy helpers removed (storage stats, quick stats, event type distribution)
 }
 
 // Global filters type (runtime authoritative state)
