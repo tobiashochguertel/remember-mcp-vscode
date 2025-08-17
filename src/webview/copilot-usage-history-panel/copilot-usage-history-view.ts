@@ -200,7 +200,7 @@ export class CopilotUsageHistoryView {
 		return `
 			<script>
 			(function() {
-				const vscode = acquireVsCodeApi();
+				if (!window.vscode) { window.vscode = acquireVsCodeApi(); }
 
 				function sendMessage(command, data) {
 					// Send both type and command for compatibility
@@ -208,7 +208,7 @@ export class CopilotUsageHistoryView {
 					if (data && typeof data === 'object') {
 						Object.assign(payload, data);
 					}
-					vscode.postMessage(payload);
+					window.vscode.postMessage(payload);
 				}
 
 				// Expose globally

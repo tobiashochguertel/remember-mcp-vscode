@@ -66,6 +66,8 @@ export class DailyRequestsChartView implements ComponentView<DailyRequestsChartR
 				]
 			},
 			options: {
+				// Limit to mouse/click events to avoid non-passive touch listeners in Chrome warnings
+				events: ['mousemove', 'mouseout', 'click'],
 				responsive: true,
 				maintainAspectRatio: false,
 				plugins: {
@@ -117,7 +119,7 @@ export class DailyRequestsChartView implements ComponentView<DailyRequestsChartR
 			<section class="daily-requests-chart panel-section">
 				<h4>${state.title ?? 'Daily Requests'}</h4>
 				<div class="chart-container panel-section" style="height: 200px; position: relative;">
-					<canvas id="${canvasId}"></canvas>
+					<canvas id="${canvasId}" style="touch-action: manipulation;"></canvas>
 				</div>
 				<script>
 					(function() {

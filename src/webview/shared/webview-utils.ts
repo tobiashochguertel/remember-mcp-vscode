@@ -25,10 +25,13 @@ export class WebviewUtils {
      */
 	public static getSharedScript(): string {
 		return `<script>
-			const vscode = acquireVsCodeApi();
+			// Acquire and cache the VS Code API once per webview document
+			if (!window.vscode) {
+				window.vscode = acquireVsCodeApi();
+			}
 
 			function sendMessage(type, data = {}) {
-				vscode.postMessage({
+				window.vscode.postMessage({
 					type: type,
 					...data
 				});

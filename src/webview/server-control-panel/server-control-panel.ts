@@ -369,12 +369,9 @@ export class ServerControlPanel implements vscode.WebviewViewProvider {
             <button class="secondary" onclick="sendMessage('recheckPrerequisites')">Check Again</button>
             
             <script>
-                const vscode = acquireVsCodeApi();
-                
+                if (!window.vscode) { window.vscode = acquireVsCodeApi(); }
                 function sendMessage(type) {
-                    vscode.postMessage({
-                        type: type
-                    });
+                    window.vscode.postMessage({ type });
                 }
             </script>
         </body>
@@ -533,12 +530,9 @@ export class ServerControlPanel implements vscode.WebviewViewProvider {
             </div>
             
             <script>
-                const vscode = acquireVsCodeApi();
-                
+                if (!window.vscode) { window.vscode = acquireVsCodeApi(); }
                 function sendMessage(type) {
-                    vscode.postMessage({
-                        type: type
-                    });
+                    window.vscode.postMessage({ type });
                 }
             </script>
         </body>
