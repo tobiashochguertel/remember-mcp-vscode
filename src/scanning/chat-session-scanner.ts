@@ -175,6 +175,9 @@ export class ChatSessionScanner {
 				turns: rawSession.requests || []
 			};
 			delete (session as any).requests; // Remove the original field
+
+			// Prune large text-based fields to reduce memory footprint
+			this.pruneHeavyTextFields(session);
             
 			// Validate session structure
 			if (!this.isValidSession(session)) {
@@ -197,6 +200,76 @@ export class ChatSessionScanner {
 		} catch (error) {
 			this.logger.error(`Error parsing session file ${filePath}: ${error}`);
 			return null;
+		}
+	}
+
+	/**
+	 * Remove or blank large text properties to reduce memory usage while preserving structure
+	 * - Keep required string fields but set to '' where validated by isValidSession
+	 * - Preserve arrays where presence is semantically meaningful, but blank inner strings
+	 */
+	private pruneHeavyTextFields(session: CopilotChatSession): void {
+		try {
+			for (const turn of session.turns as any[]) {
+				// User message
+				if (turn.message) {
+					if (typeof turn.message.text === 'string') {
+						turn.message.text = '';
+					}
+					if (Array.isArray(turn.message.parts)) {
+						turn.message.parts = [];
+					}
+				}
+
+				// Model response chunks
+				if (Array.isArray(turn.response)) {
+					turn.response = [];
+				}
+
+				// Result metadata and tool call rounds (preserve structure, blank big strings)
+				const md = turn.result?.metadata;
+				if (md) {
+					if (Array.isArray(md.toolCallRounds)) {
+						for (const round of md.toolCallRounds as any[]) {
+							if (typeof round.response === 'string') {
+								round.response = '';
+							}
+							if (Array.isArray(round.toolCalls)) {
+								for (const tc of round.toolCalls) {
+									if (typeof tc.arguments === 'string') {
+										tc.arguments = '';
+									}
+								}
+							}
+						}
+					}
+					// Drop bulky optional arrays we don't consume directly
+					delete (md as any).codeBlocks;
+					delete (md as any).renderedUserMessage;
+					delete (md as any).renderedGlobalContext;
+				}
+
+				// Code citations: preserve presence, blank snippet text
+				if (Array.isArray(turn.codeCitations)) {
+					for (const c of turn.codeCitations) {
+						if (typeof c.snippet === 'string') {
+							c.snippet = '';
+						}
+					}
+				}
+
+				// Followups: preserve presence, blank text
+				if (Array.isArray(turn.followups)) {
+					for (const f of turn.followups) {
+						if (typeof f.message === 'string') {
+							f.message = '';
+						}
+					}
+				}
+			}
+		} catch (e) {
+			// Be defensive: pruning should never break scanning
+			this.logger.trace(`PruneHeavyTextFields encountered an issue: ${e}`);
 		}
 	}
 
