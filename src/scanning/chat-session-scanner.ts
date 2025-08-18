@@ -165,9 +165,59 @@ export class ChatSessionScanner {
 			// Get file stats
 			const stats = await fsPromises.stat(filePath);
             
-			// Read and parse file content
+			// Read and parse file content (reviver prunes large fields during parsing)
 			const content = await fsPromises.readFile(filePath, 'utf-8');
-			const rawSession = JSON.parse(content);
+			const rawSession = JSON.parse(content, function (this: any, key: string, value: any) {
+				try {
+					// Root key is ''
+					if (key === '') { return value; }
+
+					const holder = this as any;
+
+					// message.text and message.parts
+					if (key === 'text' && holder && typeof holder === 'object' && Array.isArray(holder.parts)) {
+						return '';
+					}
+					if (key === 'parts' && holder && typeof holder.text === 'string' && Array.isArray(value)) {
+						return [];
+					}
+
+					// turn.response (array) and toolCallRound.response (string)
+					if (key === 'response') {
+						if (typeof value === 'string' && holder && Array.isArray(holder.toolCalls)) {
+							// toolCallRound.response
+							return '';
+						}
+						if (Array.isArray(value)) {
+							// turn.response array
+							return [];
+						}
+					}
+
+					// toolCalls[].arguments
+					if (key === 'arguments' && holder && typeof holder.name === 'string' && typeof value === 'string') {
+						return '';
+					}
+
+					// Optional bulky arrays in metadata
+					if (key === 'codeBlocks' || key === 'renderedUserMessage' || key === 'renderedGlobalContext') {
+						return undefined;
+					}
+
+					// codeCitations[].snippet
+					if (key === 'snippet' && holder && typeof holder.license === 'string' && typeof value === 'string') {
+						return '';
+					}
+
+					// followups[].message (string variant)
+					if (key === 'message' && typeof value === 'string') {
+						return '';
+					}
+				} catch {
+					// Best effort; fall through to keep original value
+				}
+				return value;
+			});
 			
 			// Map 'requests' field to 'turns' to match our interface
 			const session: CopilotChatSession = {
@@ -176,8 +226,7 @@ export class ChatSessionScanner {
 			};
 			delete (session as any).requests; // Remove the original field
 
-			// Prune large text-based fields to reduce memory footprint
-			this.pruneHeavyTextFields(session);
+			// Note: Heavy text fields are pruned via the JSON.parse reviver above.
             
 			// Validate session structure
 			if (!this.isValidSession(session)) {
@@ -203,75 +252,7 @@ export class ChatSessionScanner {
 		}
 	}
 
-	/**
-	 * Remove or blank large text properties to reduce memory usage while preserving structure
-	 * - Keep required string fields but set to '' where validated by isValidSession
-	 * - Preserve arrays where presence is semantically meaningful, but blank inner strings
-	 */
-	private pruneHeavyTextFields(session: CopilotChatSession): void {
-		try {
-			for (const turn of session.turns as any[]) {
-				// User message
-				if (turn.message) {
-					if (typeof turn.message.text === 'string') {
-						turn.message.text = '';
-					}
-					if (Array.isArray(turn.message.parts)) {
-						turn.message.parts = [];
-					}
-				}
 
-				// Model response chunks
-				if (Array.isArray(turn.response)) {
-					turn.response = [];
-				}
-
-				// Result metadata and tool call rounds (preserve structure, blank big strings)
-				const md = turn.result?.metadata;
-				if (md) {
-					if (Array.isArray(md.toolCallRounds)) {
-						for (const round of md.toolCallRounds as any[]) {
-							if (typeof round.response === 'string') {
-								round.response = '';
-							}
-							if (Array.isArray(round.toolCalls)) {
-								for (const tc of round.toolCalls) {
-									if (typeof tc.arguments === 'string') {
-										tc.arguments = '';
-									}
-								}
-							}
-						}
-					}
-					// Drop bulky optional arrays we don't consume directly
-					delete (md as any).codeBlocks;
-					delete (md as any).renderedUserMessage;
-					delete (md as any).renderedGlobalContext;
-				}
-
-				// Code citations: preserve presence, blank snippet text
-				if (Array.isArray(turn.codeCitations)) {
-					for (const c of turn.codeCitations) {
-						if (typeof c.snippet === 'string') {
-							c.snippet = '';
-						}
-					}
-				}
-
-				// Followups: preserve presence, blank text
-				if (Array.isArray(turn.followups)) {
-					for (const f of turn.followups) {
-						if (typeof f.message === 'string') {
-							f.message = '';
-						}
-					}
-				}
-			}
-		} catch (e) {
-			// Be defensive: pruning should never break scanning
-			this.logger.trace(`PruneHeavyTextFields encountered an issue: ${e}`);
-		}
-	}
 
 	/**
      * Scan all session files and return parsed results
@@ -544,8 +525,9 @@ export class ChatSessionScanner {
 				return false;
 			}
             
-			if (!turn.message || typeof turn.message.text !== 'string') {
-				this.logger.trace(`Turn ${i} invalid message: ${!turn.message ? 'missing' : typeof turn.message.text}`);
+			// Message object must exist, but we do not require text to be a string here
+			if (!turn.message) {
+				this.logger.trace(`Turn ${i} invalid message: missing`);
 				return false;
 			}
             

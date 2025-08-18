@@ -145,7 +145,7 @@ export class CopilotUsageHistoryView {
 		const vm = this._model.kpiChipsViewModel;
 		const vmState = vm.getState();
 		const renderState: KpiChipsRenderState = {
-			chips: vmState.chips.map(c => ({ label: c.label, value: c.value })),
+			chips: vmState.chips.map(c => ({ label: c.label, value: c.value, tooltip: c.tooltip })),
 			isLoading: vmState.isLoading
 		};
 		// Intentionally no heading for KPI chips (design choice)

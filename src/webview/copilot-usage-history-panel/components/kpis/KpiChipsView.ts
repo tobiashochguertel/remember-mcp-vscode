@@ -1,7 +1,7 @@
 import { ComponentView } from '../shared/ComponentBase';
 
 export interface KpiChipsRenderState {
-	chips: Array<{ label: string; value: string }>;
+	chips: Array<{ label: string; value: string; tooltip?: string }>;
 	isLoading: boolean;
 }
 
@@ -15,7 +15,7 @@ export class KpiChipsView implements ComponentView<KpiChipsRenderState, never> {
 				<section class="panel-section" aria-label="Key metrics">
 					<div class="kpi-grid" role="list">
 						${items.map(i => `
-							<div class="kpi-chip" role="listitem">
+							<div class="kpi-chip" role="listitem"${i.tooltip ? ` title="${escapeHtml(i.tooltip)}"` : ''}>
 								<div class="label">${i.label}</div>
 								<div class="value">${i.value}</div>
 							</div>
@@ -24,4 +24,14 @@ export class KpiChipsView implements ComponentView<KpiChipsRenderState, never> {
 				</section>
 			`;
 	}
+}
+
+// Minimal HTML escape to keep title safe
+function escapeHtml(input: string): string {
+	return input
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;');
 }
