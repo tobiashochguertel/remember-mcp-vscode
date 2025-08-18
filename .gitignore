@@ -81,6 +81,9 @@ README_marketplace.md
 temp_auto/
 temp_summary/
 
+# Local AI test data (keep local)
+ai-test-data/
+
 # dotenv environment variable files
 .env
 .env.*
