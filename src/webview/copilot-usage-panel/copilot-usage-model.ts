@@ -4,11 +4,9 @@ import { ILogger } from '../../types/logger';
 import * as vscode from 'vscode';
 
 /**
- * Model for Copilot Usage Panel
- * Manages data and business logic, provides observable interface
- * 
- * NEW: Uses raw session data for accurate model usage counting based on toolCallRounds
- * ENHANCED: Filters sessions by current workspace for workspace-specific usage stats
+ * Legacy model (pre micro-MVVM) for Copilot Usage Panel.
+ * Retained temporarily for reference during refactor.
+ * Use CopilotUsagePanelModel + component view-models instead.
  */
 export class CopilotUsageModel {
 	private _listeners: Array<() => void> = [];

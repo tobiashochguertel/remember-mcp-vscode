@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { ServiceContainer } from '../../types/service-container';
-import { CopilotUsageModel } from './copilot-usage-model';
 import { CopilotUsageView } from './copilot-usage-view';
+import { CopilotUsagePanelModel } from './copilot-usage-panel-model';
 
 /**
  * Main panel class that implements WebviewViewProvider
@@ -10,7 +10,7 @@ import { CopilotUsageView } from './copilot-usage-view';
 export class CopilotUsagePanel implements vscode.WebviewViewProvider, vscode.Disposable {
 	public static readonly viewType = 'remember-mcp-usage-panel';
 
-	private _model: CopilotUsageModel | null = null;
+	private _model: CopilotUsagePanelModel | null = null;
 	private _view: CopilotUsageView | null = null;
 	private _disposables: vscode.Disposable[] = [];
 
@@ -52,7 +52,7 @@ export class CopilotUsagePanel implements vscode.WebviewViewProvider, vscode.Dis
 		}
 
 		// Initialize model and view
-		this._model = new CopilotUsageModel(unifiedDataService, this.context, serviceContainer.getLogger());
+		this._model = new CopilotUsagePanelModel(this.context, unifiedDataService, serviceContainer.getLogger());
 		this._view = new CopilotUsageView(webviewView.webview, this._model, this.extensionUri, serviceContainer.getLogger());
 
 		// Handle messages from the webview
@@ -79,6 +79,24 @@ export class CopilotUsagePanel implements vscode.WebviewViewProvider, vscode.Dis
 				break;
 			case 'refresh':
 				await this.handleRefresh();
+				break;
+			case 'toggleConsent':
+				try {
+					const enabled = this._model.toggleConsent();
+					vscode.window.showInformationMessage(`Session analysis ${enabled ? 'enabled' : 'disabled'}.`);
+				} catch (error) {
+					console.error('Error toggling session analysis consent:', error);
+					vscode.window.showErrorMessage('Failed to toggle session analysis.');
+				}
+				break;
+			case 'runNow':
+				try {
+					await this._model.runAnalysisOnce();
+					vscode.window.showInformationMessage('Session analysis run completed.');
+				} catch (error) {
+					console.error('Error running session analysis once:', error);
+					vscode.window.showErrorMessage('Failed to run session analysis.');
+				}
 				break;
 			default:
 				console.warn(`Unknown message type: ${message.type}`);
