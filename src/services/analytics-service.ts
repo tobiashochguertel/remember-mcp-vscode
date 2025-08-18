@@ -191,40 +191,17 @@ export class AnalyticsService {
 
 	getDailyRequests(filter?: AnalyticsFilter): Array<{ date: string; requests: number }> {
 		const reqs = this.applyFilterToTurns(this.flattenTurns(), filter);
-		
-		// Group requests by date
-		const requestsByDate = new Map<string, number>();
-		
-		for (const req of reqs) {
-			const date = req.timeISO.split('T')[0]; // Extract YYYY-MM-DD
-			const current = requestsByDate.get(date) || 0;
-			requestsByDate.set(date, current + 1);
+
+		// Group only the already-filtered requests by day (YYYY-MM-DD)
+		const countsByDate = new Map<string, number>();
+		for (const r of reqs) {
+			const date = r.timeISO.split('T')[0];
+			countsByDate.set(date, (countsByDate.get(date) ?? 0) + 1);
 		}
 
-		// Generate date range based on filter
-		const end = new Date();
-		let start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000); // Default 30 days
-
-		if (filter?.timeRange) {
-			if (filter.timeRange === 'today') {
-				start = new Date(end.getFullYear(), end.getMonth(), end.getDate());
-			} else if (filter.timeRange === '7d') {
-				start = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
-			} else if (filter.timeRange === '30d') {
-				start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
-			} else if (filter.timeRange === '90d') {
-				start = new Date(end.getTime() - 90 * 24 * 60 * 60 * 1000);
-			}
-		}
-
-		// Generate all days in range and fill with data
-		const days = this.enumerateDays(start, end);
-		const result = days.map(date => ({
-			date,
-			requests: requestsByDate.get(date) || 0
-		}));
-
-		return result;
+		// Return the days that actually have requests, sorted ascending
+		const dates = Array.from(countsByDate.keys()).sort();
+		return dates.map(date => ({ date, requests: countsByDate.get(date)! }));
 	}
 
 	private exportCsvs(): { files: Array<{ name: string; content: string }> } {

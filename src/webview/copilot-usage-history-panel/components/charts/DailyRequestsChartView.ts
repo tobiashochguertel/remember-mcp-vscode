@@ -84,7 +84,7 @@ export class DailyRequestsChartView implements ComponentView<DailyRequestsChartR
 				},
 				scales: {
 					x: {
-						display: true,
+						display: false,
 						grid: { display: false },
 						ticks: { color: 'var(--vscode-foreground)', 
 							maxRotation: 45, 
@@ -96,7 +96,7 @@ export class DailyRequestsChartView implements ComponentView<DailyRequestsChartR
 						}
 					},
 					y: { 
-						display: true, 
+						display: false, 
 						beginAtZero: true,
 						grid: { 
 							color: 'var(--vscode-panel-border)', 
@@ -118,7 +118,7 @@ export class DailyRequestsChartView implements ComponentView<DailyRequestsChartR
 		return `
 			<section class="daily-requests-chart panel-section">
 				<h4>${state.title ?? 'Daily Requests'}</h4>
-				<div class="chart-container panel-section" style="height: 200px; position: relative;">
+				<div class="chart-container panel-section" style="height: 100px; position: relative;">
 					<canvas id="${canvasId}" style="touch-action: manipulation;"></canvas>
 				</div>
 				<script>
