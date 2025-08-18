@@ -59,6 +59,10 @@ export class CopilotUsagePanelModel implements vscode.Disposable {
 		await this.sessionAnalysisViewModel.runOnce();
 	}
 
+	public setAnalysisModel(model: string): void {
+		this.sessionAnalysisViewModel.setModel(model);
+	}
+
 	public dispose(): void {
 		this.usageStatsViewModel.dispose();
 		this.sessionAnalysisViewModel.dispose();

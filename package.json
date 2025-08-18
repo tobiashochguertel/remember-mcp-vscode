@@ -165,6 +165,17 @@
           "type": "string",
           "default": "pipx run --system-site-packages --spec git+https://github.com/NiclasOlofsson/mode-manager-mcp.git mode-manager-mcp",
           "description": "Command to run the MCP server (registered with VS Code MCP system)"
+        },
+        "remember-mcp.sessionAnalysis.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable background analysis of Copilot sessions (Remember MCP)"
+        },
+        "remember-mcp.sessionAnalysis.model": {
+          "type": "string",
+          "enum": ["gpt-4o", "gpt-4o-mini", "gpt-4o-reasoning"],
+          "default": "gpt-4o-mini",
+          "description": "Default model to use for session analysis"
         }
       }
     }

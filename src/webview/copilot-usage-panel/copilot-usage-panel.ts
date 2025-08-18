@@ -80,6 +80,17 @@ export class CopilotUsagePanel implements vscode.WebviewViewProvider, vscode.Dis
 			case 'refresh':
 				await this.handleRefresh();
 				break;
+			case 'setModel':
+				try {
+					const model = typeof message.model === 'string' ? message.model : '';
+					if (!model) { throw new Error('No model specified'); }
+					this._model.setAnalysisModel(model);
+					vscode.window.showInformationMessage(`Session analysis model set to ${model}.`);
+				} catch (error) {
+					console.error('Error setting session analysis model:', error);
+					vscode.window.showErrorMessage('Failed to set session analysis model.');
+				}
+				break;
 			case 'toggleConsent':
 				try {
 					const enabled = this._model.toggleConsent();
