@@ -395,8 +395,8 @@ export class ChatSessionScanner {
 				
 				const watcher = new ForceFileWatcher(
 					pattern,
-					0, // No forced flush needed for session files
-					SESSION_SCAN_CONSTANTS.DEFAULT_DEBOUNCE_MS
+					1000,
+					0
 				);
 				
 				// File change handler; ForceFileWatcher already applies per-file debouncing

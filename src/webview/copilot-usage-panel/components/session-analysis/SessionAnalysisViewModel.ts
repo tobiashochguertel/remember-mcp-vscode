@@ -56,8 +56,12 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 		this.logger.info?.(`SessionAnalysisVM: Workspace ID = ${this._currentWorkspaceId || 'none'}`);
 
 		// Subscribe to unified service for raw session updates
-		this._sessionResultsCallback = (results: SessionScanResult[]) => {
-			try { this.processSessionResults(results); } catch (e) { this.logger.error('SessionAnalysisVM: process error', e); }
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars
+		this._sessionResultsCallback = async (waste: SessionScanResult[]) => {
+			try {
+				const results = await this.unifiedDataService.getRawSessionResults();
+				this.processSessionResults(results);
+			} catch (e) { this.logger.error('SessionAnalysisVM: process error', e); }
 		};
 		this.unifiedDataService.onRawSessionResultsUpdated(this._sessionResultsCallback);
 		void this.initializeFromCache();
@@ -225,7 +229,7 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 				this.processSessionResults(results);
 			}
 			if (!this._latestSession) {
-				void vscode.window.showWarningMessage('No Copilot session data available to analyze yet.');
+				this.logger.warn('No Copilot session data available to analyze yet.');
 				return;
 			}
 
@@ -234,6 +238,7 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 			let model: vscode.LanguageModelChat | undefined;
 			try {
 				let models = await vscode.lm.selectChatModels({ vendor: 'copilot', family });
+				this.logger.info(`SessionAnalysisVM: Selected models for family "${family}": ${models.map(m => m.id).join(', ')}`);
 				model = models?.[0];
 				// Fallback: if no model found and family ends with -mini, try the base family (e.g., gpt-4o, gpt-5)
 				if (!model && /-mini$/.test(family)) {
@@ -263,7 +268,8 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 				new vscode.LanguageModelChatMessage('system' as any, [new vscode.LanguageModelTextPart(this.getTypeCSystemPrompt())]),
 				vscode.LanguageModelChatMessage.User([new vscode.LanguageModelTextPart(this.buildUserContentFromLatest())])
 			];
-
+			this.logger.info(`Sending prompt: ${JSON.stringify(messages)}`);
+			
 			// Send request with a short timeout; must be called from a user action (button click)
 			const cts = new vscode.CancellationTokenSource();
 			const timeout = setTimeout(() => cts.cancel(), 20000);
@@ -289,10 +295,8 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 			}
 
 			// Attempt to parse JSON from the response for sanity; show a compact success toast
-			let isValidJson = false;
 			try {
 				JSON.parse(rawText);
-				isValidJson = true;
 				this.logger.info?.('SessionAnalysisVM: Successfully parsed JSON response');
 			} catch {
 				this.logger.warn?.('SessionAnalysisVM: Model response was not valid JSON; showing raw response');
@@ -300,9 +304,6 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 
 			// Log the complete response for debugging, but show a preview in the UI
 			this.logger.info?.(`SessionAnalysisVM: Complete response: ${rawText}`);
-			const snippet = (rawText || '').slice(0, 240);
-			const statusText = isValidJson ? 'Valid JSON' : 'Raw text';
-			void vscode.window.showInformationMessage(`Model call OK (${family}). ${statusText}, ${rawText.length} chars. Preview: ${snippet}${rawText.length > 240 ? '...' : ''}`);
 
 			// Keep existing lightweight summary behavior in panel
 			this._state.analysisSummary = this.computeMinimalSummary(this._latestSession);
@@ -342,7 +343,7 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 			'',
 			'Allowed labels (choose exactly one):',
 			'- ARCHITECTURE_DESIGN',
-			'- CODE_GENERATION', 
+			'- CODE_GENERATION',
 			'- REFACTORING',
 			'- DEBUGGING',
 			'- RESEARCH_LEARNING',
@@ -381,7 +382,7 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 		const r = this._latestSession!;
 		const turns = r.session.turns || [];
 		const sessionId = r.session.sessionId;
-		
+
 		if (turns.length === 0) {
 			return 'NO_CONTENT_AVAILABLE';
 		}
@@ -392,13 +393,13 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 		for (let i = 0; i < turns.length; i++) {
 			const turn = turns[i];
 			const timestamp = new Date(turn.timestamp || Date.now()).toISOString();
-			
+
 			parts.push(`--- Turn ${i + 1} at ${timestamp} ---`);
-			
+
 			if (turn.message?.text) {
 				parts.push('User:', turn.message.text.trim());
 			}
-			
+
 			if (turn.response) {
 				let responseText = '';
 				if (Array.isArray(turn.response)) {
@@ -410,7 +411,7 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 					parts.push('Assistant:', responseText.trim());
 				}
 			}
-			
+
 			// Include tool call metadata for context
 			if (turn.result?.metadata?.toolCallRounds) {
 				const toolRounds = turn.result.metadata.toolCallRounds;
@@ -418,7 +419,7 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 					parts.push(`Tool Calls: ${toolRounds.length} rounds`);
 				}
 			}
-			
+
 			parts.push(''); // Separator between turns
 		}
 

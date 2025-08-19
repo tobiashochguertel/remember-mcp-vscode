@@ -24,8 +24,12 @@ export class UsageStatsViewModel implements vscode.Disposable {
 		this._currentWorkspaceId = this.extractCurrentWorkspaceId();
 		this.logger.info?.(`UsageStatsVM: Workspace ID = ${this._currentWorkspaceId || 'none'}`);
 
-		this._sessionResultsCallback = (results: SessionScanResult[]) => {
-			try { this.processSessionResults(results); } catch (e) { this.logger.error('UsageStatsVM: process error', e); }
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars
+		this._sessionResultsCallback = async (waste: SessionScanResult[]) => {
+			try {
+				const results = await this.unifiedDataService.getRawSessionResults();
+				this.processSessionResults(results);
+			} catch (e) { this.logger.error('UsageStatsVM: process error', e); }
 		};
 		this.unifiedDataService.onRawSessionResultsUpdated(this._sessionResultsCallback);
 		this.initializeStats();
@@ -66,7 +70,7 @@ export class UsageStatsViewModel implements vscode.Disposable {
 					const cleaned = details.split(' • ')[0]?.trim();
 					if (cleaned) { return cleaned; }
 				}
-			} catch {}
+			} catch { }
 			const modelId = request?.modelId;
 			return typeof modelId === 'string' && modelId.length > 0 ? modelId : 'unknown-model';
 		};
