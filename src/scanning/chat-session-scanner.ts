@@ -17,6 +17,15 @@ import {
 } from '../types/chat-session';
 import { ILogger } from '../types/logger';
 
+export interface ChatSessionScannerOptions {
+	/** Debounce time in ms for file watcher events */
+	debounceMs?: number;
+	/** Reserved: unified service controls watching; accepted for compatibility */
+	enableWatching?: boolean;
+	/** Reserved for future retry logic; accepted for compatibility */
+	maxRetries?: number;
+}
+
 export class ChatSessionScanner {
 	private fileWatcher?: ForceFileWatcher;
 	private sessionWatchers: ForceFileWatcher[] = [];
@@ -28,7 +37,8 @@ export class ChatSessionScanner {
     
 	constructor(
 		private readonly storagePaths: string[],
-		private readonly logger: ILogger
+		private readonly logger: ILogger,
+		private readonly options: ChatSessionScannerOptions = {}
 	) {
 		this.lastUsedStoragePaths = [...storagePaths];
 	}
@@ -172,32 +182,35 @@ export class ChatSessionScanner {
 					// Root key is ''
 					if (key === '') { return value; }
 
-					const holder = this as any;
+					// const holder = this as any; // unused when pruning is disabled
 
 					// message.text and message.parts
-					if (key === 'text' && holder && typeof holder === 'object' && Array.isArray(holder.parts)) {
-						return '';
-					}
-					if (key === 'parts' && holder && typeof holder.text === 'string' && Array.isArray(value)) {
-						return [];
-					}
+					// NOTE: Temporarily retaining full text for analysis; original pruning commented out
+					// if (key === 'text' && holder && typeof holder === 'object' && Array.isArray(holder.parts)) {
+					// 	return '';
+					// }
+					// if (key === 'parts' && holder && typeof holder.text === 'string' && Array.isArray(value)) {
+					// 	return [];
+					// }
 
 					// turn.response (array) and toolCallRound.response (string)
-					if (key === 'response') {
-						if (typeof value === 'string' && holder && Array.isArray(holder.toolCalls)) {
-							// toolCallRound.response
-							return '';
-						}
-						if (Array.isArray(value)) {
-							// turn.response array
-							return [];
-						}
-					}
+					// NOTE: Retaining responses for analysis; original pruning commented out
+					// if (key === 'response') {
+					// 	if (typeof value === 'string' && holder && Array.isArray(holder.toolCalls)) {
+					// 		// toolCallRound.response
+					// 		return '';
+					// 	}
+					// 	if (Array.isArray(value)) {
+					// 		// turn.response array
+					// 		return [];
+					// 	}
+					// }
 
 					// toolCalls[].arguments
-					if (key === 'arguments' && holder && typeof holder.name === 'string' && typeof value === 'string') {
-						return '';
-					}
+					// NOTE: Retaining arguments for analysis; original pruning commented out
+					// if (key === 'arguments' && holder && typeof holder.name === 'string' && typeof value === 'string') {
+					// 	return '';
+					// }
 
 					// Optional bulky arrays in metadata
 					if (key === 'codeBlocks' || key === 'renderedUserMessage' || key === 'renderedGlobalContext') {
@@ -205,14 +218,16 @@ export class ChatSessionScanner {
 					}
 
 					// codeCitations[].snippet
-					if (key === 'snippet' && holder && typeof holder.license === 'string' && typeof value === 'string') {
-						return '';
-					}
+					// NOTE: Retaining snippets for analysis; original pruning commented out
+					// if (key === 'snippet' && holder && typeof holder.license === 'string' && typeof value === 'string') {
+					// 	return '';
+					// }
 
 					// followups[].message (string variant)
-					if (key === 'message' && typeof value === 'string') {
-						return '';
-					}
+					// NOTE: Retaining messages for analysis; original pruning commented out
+					// if (key === 'message' && typeof value === 'string') {
+					// 	return '';
+					// }
 				} catch {
 					// Best effort; fall through to keep original value
 				}
@@ -391,7 +406,7 @@ export class ChatSessionScanner {
 				const watcher = new ForceFileWatcher(
 					pattern,
 					0, // No forced flush needed for session files
-					SESSION_SCAN_CONSTANTS.DEFAULT_DEBOUNCE_MS // Use configured debounce from options
+					this.options.debounceMs ?? SESSION_SCAN_CONSTANTS.DEFAULT_DEBOUNCE_MS
 				);
 				
 				// File change handler; ForceFileWatcher already applies per-file debouncing

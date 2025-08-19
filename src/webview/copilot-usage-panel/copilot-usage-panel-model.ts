@@ -20,7 +20,7 @@ export class CopilotUsagePanelModel implements vscode.Disposable {
 		private readonly logger: ILogger
 	) {
 		this.usageStatsViewModel = new UsageStatsViewModel(this.unifiedDataService, this.extensionContext, this.logger);
-		this.sessionAnalysisViewModel = new SessionAnalysisViewModel(this.extensionContext, this.logger);
+		this.sessionAnalysisViewModel = new SessionAnalysisViewModel(this.unifiedDataService, this.extensionContext, this.logger);
 
 		// Bubble child VM changes
 		this.usageStatsViewModel.onChanged(() => this.emit());
