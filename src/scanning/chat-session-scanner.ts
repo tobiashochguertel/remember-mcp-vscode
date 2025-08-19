@@ -17,15 +17,6 @@ import {
 } from '../types/chat-session';
 import { ILogger } from '../types/logger';
 
-export interface ChatSessionScannerOptions {
-	/** Debounce time in ms for file watcher events */
-	debounceMs?: number;
-	/** Reserved: unified service controls watching; accepted for compatibility */
-	enableWatching?: boolean;
-	/** Reserved for future retry logic; accepted for compatibility */
-	maxRetries?: number;
-}
-
 export class ChatSessionScanner {
 	private fileWatcher?: ForceFileWatcher;
 	private sessionWatchers: ForceFileWatcher[] = [];
@@ -37,8 +28,7 @@ export class ChatSessionScanner {
     
 	constructor(
 		private readonly storagePaths: string[],
-		private readonly logger: ILogger,
-		private readonly options: ChatSessionScannerOptions = {}
+		private readonly logger: ILogger
 	) {
 		this.lastUsedStoragePaths = [...storagePaths];
 	}
@@ -406,7 +396,7 @@ export class ChatSessionScanner {
 				const watcher = new ForceFileWatcher(
 					pattern,
 					0, // No forced flush needed for session files
-					this.options.debounceMs ?? SESSION_SCAN_CONSTANTS.DEFAULT_DEBOUNCE_MS
+					SESSION_SCAN_CONSTANTS.DEFAULT_DEBOUNCE_MS
 				);
 				
 				// File change handler; ForceFileWatcher already applies per-file debouncing

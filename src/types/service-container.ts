@@ -88,12 +88,7 @@ export class ServiceContainer {
 			// Create session scanner
 			const sessionScanner = new ChatSessionScanner(
 				storagePaths,
-				this.logger,
-				{
-					enableWatching: this.sessionDataServiceOptions.enableRealTimeUpdates ?? true,
-					debounceMs: this.sessionDataServiceOptions.debounceMs ?? 500,
-					maxRetries: 3
-				}
+				this.logger
 			);
 			
 			// Create global log scanner (replaces prior CopilotLogScanner)
