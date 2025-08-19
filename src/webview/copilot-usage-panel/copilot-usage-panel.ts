@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { ServiceContainer } from '../../types/service-container';
+import { ILogger } from '../../types/logger';
 import { CopilotUsageView } from './copilot-usage-view';
 import { CopilotUsagePanelModel } from './copilot-usage-panel-model';
 
@@ -13,6 +14,7 @@ export class CopilotUsagePanel implements vscode.WebviewViewProvider, vscode.Dis
 	private _model: CopilotUsagePanelModel | null = null;
 	private _view: CopilotUsageView | null = null;
 	private _disposables: vscode.Disposable[] = [];
+	private logger!: ILogger; // Logger must always be available from ServiceContainer
 
 	constructor(
 		private readonly extensionUri: vscode.Uri,
@@ -44,7 +46,10 @@ export class CopilotUsagePanel implements vscode.WebviewViewProvider, vscode.Dis
 
 		const serviceContainer = ServiceContainer.getInstance();
 		const unifiedDataService = serviceContainer.getUnifiedSessionDataService();
+		this.logger = serviceContainer.getLogger(); // Must not be null - crash if it is
+		
 		if (!unifiedDataService) {
+			this.logger.error('UnifiedDataService not available in ServiceContainer');
 			console.error('UnifiedDataService not available in ServiceContainer');
 			// Show error in webview
 			webviewView.webview.html = this.generateErrorHtml('Data service not available');
@@ -52,8 +57,8 @@ export class CopilotUsagePanel implements vscode.WebviewViewProvider, vscode.Dis
 		}
 
 		// Initialize model and view
-		this._model = new CopilotUsagePanelModel(this.context, unifiedDataService, serviceContainer.getLogger());
-		this._view = new CopilotUsageView(webviewView.webview, this._model, this.extensionUri, serviceContainer.getLogger());
+		this._model = new CopilotUsagePanelModel(this.context, unifiedDataService, this.logger);
+		this._view = new CopilotUsageView(webviewView.webview, this._model, this.extensionUri, this.logger);
 
 		// Handle messages from the webview
 		const messageHandler = webviewView.webview.onDidReceiveMessage(async (message) => {
@@ -85,8 +90,10 @@ export class CopilotUsagePanel implements vscode.WebviewViewProvider, vscode.Dis
 					const model = typeof message.model === 'string' ? message.model : '';
 					if (!model) { throw new Error('No model specified'); }
 					this._model.setAnalysisModel(model);
+					this.logger.info(`Session analysis model set to ${model}`);
 					vscode.window.showInformationMessage(`Session analysis model set to ${model}.`);
 				} catch (error) {
+					this.logger.error('Error setting session analysis model:', error);
 					console.error('Error setting session analysis model:', error);
 					vscode.window.showErrorMessage('Failed to set session analysis model.');
 				}
@@ -94,8 +101,10 @@ export class CopilotUsagePanel implements vscode.WebviewViewProvider, vscode.Dis
 			case 'toggleConsent':
 				try {
 					const enabled = this._model.toggleConsent();
+					this.logger.info(`Session analysis ${enabled ? 'enabled' : 'disabled'}`);
 					vscode.window.showInformationMessage(`Session analysis ${enabled ? 'enabled' : 'disabled'}.`);
 				} catch (error) {
+					this.logger.error('Error toggling session analysis consent:', error);
 					console.error('Error toggling session analysis consent:', error);
 					vscode.window.showErrorMessage('Failed to toggle session analysis.');
 				}
@@ -103,7 +112,7 @@ export class CopilotUsagePanel implements vscode.WebviewViewProvider, vscode.Dis
 			case 'runNow':
 				try {
 					await this._model.runAnalysisOnce();
-					vscode.window.showInformationMessage('Session analysis run completed.');
+					this.logger.info('Session analysis run completed.');
 				} catch (error) {
 					console.error('Error running session analysis once:', error);
 					vscode.window.showErrorMessage('Failed to run session analysis.');
@@ -124,8 +133,10 @@ export class CopilotUsagePanel implements vscode.WebviewViewProvider, vscode.Dis
 
 		try {
 			await this._model.clearStats();
+			this.logger.info('Model usage statistics cleared');
 			vscode.window.showInformationMessage('Model usage statistics cleared.');
 		} catch (error) {
+			this.logger.error('Error clearing statistics:', error);
 			console.error('Error clearing statistics:', error);
 			vscode.window.showErrorMessage('Failed to clear usage statistics.');
 		}
@@ -141,7 +152,9 @@ export class CopilotUsagePanel implements vscode.WebviewViewProvider, vscode.Dis
 
 		try {
 			await this._model.refreshStats();
+			this.logger.info('Usage statistics refreshed');
 		} catch (error) {
+			this.logger.error('Error refreshing statistics:', error);
 			console.error('Error refreshing statistics:', error);
 			vscode.window.showErrorMessage('Failed to refresh usage statistics.');
 		}

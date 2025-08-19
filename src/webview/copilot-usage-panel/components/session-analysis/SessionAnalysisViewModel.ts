@@ -15,6 +15,11 @@ export type SessionAnalysisState = {
 		lastUserPromptPreview?: string;
 		lastResponseChars: number;
 	};
+	lastAnalysisResult?: {
+		primaryPattern: string;
+		confidence: number;
+		reasons?: string[];
+	};
 };
 
 /**
@@ -294,15 +299,33 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 				clearTimeout(timeout);
 			}
 
-			// Attempt to parse JSON from the response for sanity; show a compact success toast
+			// Attempt to parse JSON from the response and store the analysis result
 			try {
-				JSON.parse(rawText);
+				const parsed = JSON.parse(rawText);
 				this.logger.info?.('SessionAnalysisVM: Successfully parsed JSON response');
+				
+				// Extract analysis result from parsed response
+				if (parsed && typeof parsed === 'object') {
+					// Handle both single object and array responses
+					const result = Array.isArray(parsed) ? parsed[0] : parsed;
+					if (result && result.primaryPattern && typeof result.confidence === 'number') {
+						this._state.lastAnalysisResult = {
+							primaryPattern: result.primaryPattern,
+							confidence: result.confidence,
+							reasons: Array.isArray(result.reasons) ? result.reasons : undefined
+						};
+						this.logger.info?.(`SessionAnalysisVM: Stored analysis result: ${result.primaryPattern} (${Math.round(result.confidence * 100)}%)`);
+					} else {
+						this.logger.warn?.('SessionAnalysisVM: Parsed response missing expected fields (primaryPattern, confidence)');
+					}
+				}
 			} catch {
 				this.logger.warn?.('SessionAnalysisVM: Model response was not valid JSON; showing raw response');
+				// Clear any previous analysis result if we can't parse the new one
+				this._state.lastAnalysisResult = undefined;
 			}
 
-			// Log the complete response for debugging, but show a preview in the UI
+			// Log the complete response for debugging
 			this.logger.info?.(`SessionAnalysisVM: Complete response: ${rawText}`);
 
 			// Keep existing lightweight summary behavior in panel

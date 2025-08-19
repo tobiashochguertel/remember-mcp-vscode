@@ -10,16 +10,14 @@ export class UsageStatsView {
 			: '<tr><td colspan=\"2\" class=\"no-data\">No usage data available<br/>Start using Copilot to track usage</td></tr>';
 
 		return `
-    <section class=\"card\">\n\t\t\t<h2>Model usage</h2>\n\t\t\t<div class=\"summary\">Total: ${state.total} requests</div>\n\t\t\t<table>\n\t\t\t\t<thead>\n\t\t\t\t\t<tr>\n\t\t\t\t\t\t<th>Model</th>\n\t\t\t\t\t\t<th style=\"text-align:right;\">Count</th>\n\t\t\t\t\t</tr>\n\t\t\t\t</thead>\n\t\t\t\t<tbody>\n\t\t\t\t\t${rows}\n\t\t\t\t</tbody>\n\t\t\t</table>\n\t\t\t<div class=\"actions\">\n\t\t\t\t<button class=\"secondary\" id=\"btnClearStats\" ${state.stats.length ? '' : 'disabled'}>Clear</button>\n\t\t\t\t<button id=\"btnRefreshStats\">Refresh</button>\n\t\t\t</div>\n\t\t</section>`;
+    <section class=\"card\">\n\t\t\t<h2>Model usage</h2>\n\t\t\t<div class=\"summary\">Total: ${state.total} requests</div>\n\t\t\t<table>\n\t\t\t\t<thead>\n\t\t\t\t\t<tr>\n\t\t\t\t\t\t<th>Model</th>\n\t\t\t\t\t\t<th style=\"text-align:right;\">Count</th>\n\t\t\t\t\t</tr>\n\t\t\t\t</thead>\n\t\t\t\t<tbody>\n\t\t\t\t\t${rows}\n\t\t\t\t</tbody>\n\t\t\t</table>\n\t\t\t<div class=\"actions\">\n\t\t\t\t<button class=\"secondary\" id=\"btnClearStats\" ${state.stats.length ? '' : 'disabled'}>Clear</button>\n\t\t\t</div>\n\t\t</section>`;
 	}
 
 	getClientInitScript(): string {
 		return `
     (function(){
       const clearBtn = document.getElementById('btnClearStats');
-      const refreshBtn = document.getElementById('btnRefreshStats');
       if (clearBtn) clearBtn.addEventListener('click', () => sendMessage('clearStats'));
-      if (refreshBtn) refreshBtn.addEventListener('click', () => sendMessage('refresh'));
       // Flash updated rows
       document.querySelectorAll('.flash-row').forEach(row => {
         setTimeout(() => row.classList.remove('flash-row'), 800);

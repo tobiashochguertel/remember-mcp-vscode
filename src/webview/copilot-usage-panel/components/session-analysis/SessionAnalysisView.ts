@@ -1,18 +1,11 @@
 export class SessionAnalysisView {
-	render(state: { enabled: boolean; model: string; status: 'idle' | 'running' | 'disabled'; analysisSummary?: { latestSessionId: string; latestTimestamp: number; totalTurns: number; totalToolCallRounds: number; lastUserPromptPreview?: string; lastResponseChars: number } }): string {
+	render(state: { enabled: boolean; model: string; status: 'idle' | 'running' | 'disabled'; analysisSummary?: { latestSessionId: string; latestTimestamp: number; totalTurns: number; totalToolCallRounds: number; lastUserPromptPreview?: string; lastResponseChars: number }; lastAnalysisResult?: { primaryPattern: string; confidence: number; reasons?: string[] } }): string {
 		return `
 		<section class="card">
 			<h2>Session analysis (GitHub Models)</h2>
 			<div class="summary">Status: ${state.status} • Model: ${state.model}</div>
 			<div class="actions">
-				<button id="btnRequestConsent">${state.enabled ? 'Disable background analysis' : 'Enable background analysis'}</button>
 				<button id="btnRunOnce">Run once</button>
-			</div>
-			<div class="field" style="margin-top:8px">
-				<label for="selModel" style="margin-right:6px">Model:</label>
-				<select id="selModel">
-					${this.renderModelOptions(state.model)}
-				</select>
 			</div>
 			${this.renderResults(state)}
 		</section>`;
@@ -40,54 +33,84 @@ export class SessionAnalysisView {
 		});
 	}
 
-	private renderModelOptions(selected: string): string {
-		const options = [
-			{ value: 'gpt-5-mini', label: 'gpt-5-mini' },
-			{ value: 'gpt-4o', label: 'gpt-4o' },
-			{ value: 'gpt-4o-mini', label: 'gpt-4o-mini' },
-			{ value: 'gpt-4o-reasoning', label: 'gpt-4o-reasoning' },
-		];
-		return options
-			.map(o => `<option value=\"${o.value}\"${o.value === selected ? ' selected' : ''}>${o.label}</option>`)
-			.join('');
+	private getConfidenceIndicator(confidence: number): { icon: string; color: string; severity: string } {
+		if (confidence >= 0.8) {
+			// High confidence - success/green (like passing tests)
+			return { icon: 'codicon-check', color: 'var(--vscode-charts-green)', severity: 'high' };
+		} else if (confidence >= 0.5) {
+			// Medium confidence - warning/orange (like warnings)
+			return { icon: 'codicon-warning', color: 'var(--vscode-charts-orange)', severity: 'medium' };
+		} else {
+			// Low confidence - error/red (like errors)
+			return { icon: 'codicon-error', color: 'var(--vscode-charts-red)', severity: 'low' };
+		}
 	}
 
 	getClientInitScript(): string {
 		return `
 		(function(){
-			const consentBtn = document.getElementById('btnRequestConsent');
 			const runBtn = document.getElementById('btnRunOnce');
-			const modelSelect = document.getElementById('selModel');
-			if (consentBtn) consentBtn.addEventListener('click', () => sendMessage('toggleConsent'));
 			if (runBtn) runBtn.addEventListener('click', () => sendMessage('runNow'));
-			if (modelSelect) modelSelect.addEventListener('change', function (ev) {
-				var target = ev && ev.target ? ev.target : modelSelect;
-				var value = target && target.value !== undefined ? target.value : null;
-				if (value) sendMessage('setModel', { model: value });
-			});
 		})();
 		`;
 	}
 
-	private renderResults(state: { analysisSummary?: { latestSessionId: string; latestTimestamp: number; totalTurns: number; totalToolCallRounds: number; lastUserPromptPreview?: string; lastResponseChars: number } }): string {
+	private renderResults(state: { analysisSummary?: { latestSessionId: string; latestTimestamp: number; totalTurns: number; totalToolCallRounds: number; lastUserPromptPreview?: string; lastResponseChars: number }; lastAnalysisResult?: { primaryPattern: string; confidence: number; reasons?: string[] } }): string {
 		const s = state.analysisSummary;
 		if (!s) {
-			return '<div class="note">No analysis yet. Enable background analysis or click Run once.</div>';
+			return '<div class="note">No analysis yet. Click Run once to analyze latest session.</div>';
 		}
 		const dt = new Date(s.latestTimestamp);
 		const time = Number.isNaN(dt.getTime()) ? '' : dt.toLocaleString();
 
+		let analysisResultHtml = '';
+		if (state.lastAnalysisResult) {
+			const result = state.lastAnalysisResult;
+			const indicator = this.getConfidenceIndicator(result.confidence);
+			const confidencePercent = Math.round(result.confidence * 100);
+			
+			// Format reasons if available
+			let reasonsHtml = '';
+			if (result.reasons && result.reasons.length > 0) {
+				const reasonsList = result.reasons.map(reason => `<li>${this.escapeHtml(reason)}</li>`).join('');
+				reasonsHtml = `<ul class="analysis-reasons">${reasonsList}</ul>`;
+			}
+
+			analysisResultHtml = `
+				<dt>Primary pattern</dt>
+				<dd class="analysis-result">
+					<span class="pattern-indicator">
+						<span class="codicon ${indicator.icon}" style="color: ${indicator.color};" title="Confidence: ${confidencePercent}%"></span>
+						<strong class="pattern-name">${this.escapeHtml(result.primaryPattern)}</strong>
+						<span class="confidence-score" style="color: ${indicator.color};">(${confidencePercent}%)</span>
+					</span>
+					${reasonsHtml}
+				</dd>`;
+		}
+
 		return `
 			<div class="group" style="margin-top:10px">
-				<div class="section-title">Latest session</div>
-				<div class="kv">
-					<div class="row"><span class="k">Session ID</span><span class="v">${s.latestSessionId}</span></div>
-					<div class="row"><span class="k">When</span><span class="v">${time}</span></div>
-					<div class="row"><span class="k">Turns</span><span class="v">${s.totalTurns}</span></div>
-					<div class="row"><span class="k">Tool call rounds</span><span class="v">${s.totalToolCallRounds}</span></div>
-					<div class="row"><span class="k">Last user prompt</span><span class="v">${this.escapeHtml(s.lastUserPromptPreview || '')}</span></div>
-					<div class="row"><span class="k">Last response size</span><span class="v">${s.lastResponseChars.toLocaleString()} chars</span></div>
-				</div>
+				<h3>Latest session</h3>
+				<dl class="session-stats">
+					<dt>Session ID</dt>
+					<dd>${this.escapeHtml(s.latestSessionId)}</dd>
+					
+					<dt>When</dt>
+					<dd><time datetime="${new Date(s.latestTimestamp).toISOString()}">${time}</time></dd>
+					
+					<dt>Turns</dt>
+					<dd>${s.totalTurns}</dd>
+					
+					<dt>Tool call rounds</dt>
+					<dd>${s.totalToolCallRounds}</dd>
+					
+					<dt>Last user prompt</dt>
+					<dd class="user-prompt">${this.escapeHtml(s.lastUserPromptPreview || '')}</dd>
+					
+					<dt>Last response size</dt>
+					<dd>${s.lastResponseChars.toLocaleString()} chars</dd>
+					${analysisResultHtml}
+				</dl>
 			</div>`;
 	}
 }
