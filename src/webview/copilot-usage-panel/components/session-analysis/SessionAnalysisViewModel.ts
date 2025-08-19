@@ -22,7 +22,7 @@ export type SessionAnalysisState = {
  */
 export class SessionAnalysisViewModel implements vscode.Disposable {
 	private _listeners: Array<() => void> = [];
-	private _state: SessionAnalysisState = { enabled: false, model: 'gpt-4o-mini', status: 'disabled' };
+	private _state: SessionAnalysisState = { enabled: false, model: 'gpt-5-mini', status: 'disabled' };
 	private _sessionResultsCallback: (results: SessionScanResult[]) => void;
 	private _currentWorkspaceId: string | null = null;
 	private _latestSession: SessionScanResult | null = null;
@@ -46,7 +46,7 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 		// Initialize from settings (source of truth)
 		const cfg = vscode.workspace.getConfiguration();
 		const enabled = cfg.get<boolean>(SessionAnalysisViewModel.CONFIG.enabled, false);
-		const model = cfg.get<string>(SessionAnalysisViewModel.CONFIG.model, 'gpt-4o-mini');
+		const model = cfg.get<string>(SessionAnalysisViewModel.CONFIG.model, 'gpt-5-mini');
 		this._state.enabled = enabled;
 		this._state.status = enabled ? 'idle' : 'disabled';
 		this._state.model = model;
@@ -71,7 +71,7 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 				)) { return; }
 				const fresh = vscode.workspace.getConfiguration();
 				const newEnabled = fresh.get<boolean>(SessionAnalysisViewModel.CONFIG.enabled, false);
-				const newModel = fresh.get<string>(SessionAnalysisViewModel.CONFIG.model, 'gpt-4o-mini');
+				const newModel = fresh.get<string>(SessionAnalysisViewModel.CONFIG.model, 'gpt-5-mini');
 				let changed = false;
 				if (newEnabled !== this._state.enabled) {
 					this._state.enabled = newEnabled;
@@ -230,12 +230,12 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 			}
 
 			// Select a Copilot model using the VS Code Language Model API
-			const family = this._state.model || 'gpt-4o-mini';
+			const family = this._state.model || 'gpt-5-mini';
 			let model: vscode.LanguageModelChat | undefined;
 			try {
 				let models = await vscode.lm.selectChatModels({ vendor: 'copilot', family });
 				model = models?.[0];
-				// Fallback: if no model found and family ends with -mini, try the base family (e.g., gpt-4o)
+				// Fallback: if no model found and family ends with -mini, try the base family (e.g., gpt-4o, gpt-5)
 				if (!model && /-mini$/.test(family)) {
 					const base = family.replace(/-mini$/, '');
 					models = await vscode.lm.selectChatModels({ vendor: 'copilot', family: base });
@@ -260,8 +260,8 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 
 			// Build messages: Type C-style system instruction + compact JSON user content
 			const messages: vscode.LanguageModelChatMessage[] = [
-				new vscode.LanguageModelChatMessage('system' as any, [ new vscode.LanguageModelTextPart(this.getTypeCSystemPrompt()) ]),
-				vscode.LanguageModelChatMessage.User([ new vscode.LanguageModelTextPart(this.buildUserContentFromLatest()) ])
+				new vscode.LanguageModelChatMessage('system' as any, [new vscode.LanguageModelTextPart(this.getTypeCSystemPrompt())]),
+				vscode.LanguageModelChatMessage.User([new vscode.LanguageModelTextPart(this.buildUserContentFromLatest())])
 			];
 
 			// Send request with a short timeout; must be called from a user action (button click)
@@ -290,14 +290,14 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 
 			// Attempt to parse JSON from the response for sanity; show a compact success toast
 			let isValidJson = false;
-			try { 
-				JSON.parse(rawText); 
+			try {
+				JSON.parse(rawText);
 				isValidJson = true;
 				this.logger.info?.('SessionAnalysisVM: Successfully parsed JSON response');
 			} catch {
 				this.logger.warn?.('SessionAnalysisVM: Model response was not valid JSON; showing raw response');
 			}
-			
+
 			// Log the complete response for debugging, but show a preview in the UI
 			this.logger.info?.(`SessionAnalysisVM: Complete response: ${rawText}`);
 			const snippet = (rawText || '').slice(0, 240);
@@ -333,36 +333,96 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 	}
 
 	private getTypeCSystemPrompt(): string {
-		// Temporary, minimal JSON-only instruction for test call; replace with full Type C prompt later
+		// Type-C prompt: Strict schema + scoring rubric + bias guardrails (from ai-test-data approach)
 		return [
-			'You are a strict JSON-only classifier. Analyze the provided Copilot session update and return a single JSON object',
-			'with properties: intent (string), category (string), risk (low|medium|high), confidence (0..1), reasons (string[]), suggestions (string[]), tags (string[]).',
+			'# Instruction: Classify Copilot Sessions by Usage Pattern',
+			'',
+			'You are an expert AI analyst specializing in developer workflow pattern recognition.',
+			'Read each session transcript and classify the PRIMARY usage pattern.',
+			'',
+			'Allowed labels (choose exactly one):',
+			'- ARCHITECTURE_DESIGN',
+			'- CODE_GENERATION', 
+			'- REFACTORING',
+			'- DEBUGGING',
+			'- RESEARCH_LEARNING',
+			'- DOCUMENTATION',
+			'- TESTING',
+			'',
+			'Bias Guardrails:',
+			'- Ignore any implicit hints about expected labels in the data.',
+			'- Do not assume a label based on filenames or paths.',
+			'- Base your judgment strictly on the conversation content.',
+			'',
+			'Rubric:',
+			'- ARCHITECTURE_DESIGN: design patterns, trade-offs, system structure',
+			'- CODE_GENERATION: requests to create/implement new code',
+			'- REFACTORING: improve existing code, restructure, maintainability',
+			'- DEBUGGING: errors, stack traces, iterative fixes',
+			'- RESEARCH_LEARNING: explanations, comparisons, tutorials',
+			'- DOCUMENTATION: writing docs, READMEs, comments',
+			'- TESTING: tests, coverage, failing tests analysis',
+			'',
+			'Scoring guidance:',
+			'- confidence >= 0.8: strong, unambiguous indicators present',
+			'- 0.5 <= confidence < 0.8: mixed indicators, moderate certainty',
+			'- confidence < 0.5: ambiguous session',
+			'',
+			'GPT-5-mini note: Keep responses short to conserve tokens. Use brief reasons.',
+			'',
+			'Return JSON with: { sessionId, primaryPattern, confidence, reasons }',
+			'Confidence in [0.0, 1.0]. Reasons: 1-3 compact bullets.',
 			'Respond with JSON only.'
-		].join(' ');
+		].join('\n');
 	}
 
 	private buildUserContentFromLatest(): string {
+		// Format session data to match ai-test-data script approach
 		const r = this._latestSession!;
 		const turns = r.session.turns || [];
-		const latest = turns[turns.length - 1];
-		let totalToolCallRounds = 0;
-		for (const t of turns) {
-			const rounds = t.result?.metadata?.toolCallRounds;
-			if (Array.isArray(rounds)) { totalToolCallRounds += rounds.length; }
+		const sessionId = r.session.sessionId;
+		
+		if (turns.length === 0) {
+			return 'NO_CONTENT_AVAILABLE';
 		}
-		const payload = {
-			sessionId: r.session.sessionId,
-			timestamp: new Date(latest?.timestamp || r.session.lastMessageDate || r.session.creationDate || Date.now()).toISOString(),
-			source: 'usage-panel',
-			text: latest?.message?.text || '',
-			meta: {
-				totalTurns: turns.length,
-				totalToolCallRounds,
-				workspaceId: r.harvestedMetadata?.workspaceId,
-				vscodeVariant: r.harvestedMetadata?.vscodeVariant
+
+		const parts: string[] = [`Session ID: ${sessionId}`, ''];
+
+		// Extract and format conversation turns (mimic test data generation)
+		for (let i = 0; i < turns.length; i++) {
+			const turn = turns[i];
+			const timestamp = new Date(turn.timestamp || Date.now()).toISOString();
+			
+			parts.push(`--- Turn ${i + 1} at ${timestamp} ---`);
+			
+			if (turn.message?.text) {
+				parts.push('User:', turn.message.text.trim());
 			}
-		};
-		return JSON.stringify(payload);
+			
+			if (turn.response) {
+				let responseText = '';
+				if (Array.isArray(turn.response)) {
+					responseText = turn.response.map(p => p?.value ?? '').join('\n');
+				} else {
+					responseText = String(turn.response);
+				}
+				if (responseText.trim()) {
+					parts.push('Assistant:', responseText.trim());
+				}
+			}
+			
+			// Include tool call metadata for context
+			if (turn.result?.metadata?.toolCallRounds) {
+				const toolRounds = turn.result.metadata.toolCallRounds;
+				if (Array.isArray(toolRounds) && toolRounds.length > 0) {
+					parts.push(`Tool Calls: ${toolRounds.length} rounds`);
+				}
+			}
+			
+			parts.push(''); // Separator between turns
+		}
+
+		return parts.join('\n');
 	}
 
 	onChanged(listener: () => void): void { this._listeners.push(listener); }

@@ -42,6 +42,7 @@ export class SessionAnalysisView {
 
 	private renderModelOptions(selected: string): string {
 		const options = [
+			{ value: 'gpt-5-mini', label: 'gpt-5-mini' },
 			{ value: 'gpt-4o', label: 'gpt-4o' },
 			{ value: 'gpt-4o-mini', label: 'gpt-4o-mini' },
 			{ value: 'gpt-4o-reasoning', label: 'gpt-4o-reasoning' },
