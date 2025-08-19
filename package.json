@@ -74,6 +74,12 @@
         "icon": "$(clear-all)"
       },
       {
+        "command": "remember-mcp.testProgressUpdate",
+        "title": "Test Progress Update",
+        "category": "Remember MCP",
+        "icon": "$(clock)"
+      },
+      {
         "command": "remember-mcp.showUsageHistory",
         "title": "Show Copilot Usage History",
         "category": "Copilot Usage History",
@@ -96,7 +102,7 @@
         "title": "Scan Chat Sessions",
         "category": "Copilot Usage History",
         "icon": "$(sync)"
-  }
+      }
     ],
     "menus": {
       "view/title": [
@@ -173,7 +179,11 @@
         },
         "remember-mcp.sessionAnalysis.model": {
           "type": "string",
-          "enum": ["gpt-4o", "gpt-4o-mini", "gpt-4o-reasoning"],
+          "enum": [
+            "gpt-4o",
+            "gpt-4o-mini",
+            "gpt-4o-reasoning"
+          ],
           "default": "gpt-4o-mini",
           "description": "Default model to use for session analysis"
         }
@@ -190,6 +200,8 @@
     "compile": "tsx .esbuild.ts --dev",
     "watch": "npm-run-all -p watch:*",
     "watch:esbuild": "tsx .esbuild.ts --watch --dev",
+    "watch:lint": "nodemon --watch src --ext ts,tsx --exec \"eslint src --fix --cache\"",
+    "watch:typecheck": "tsc --noEmit --watch --project tsconfig.json",
     "package": "tsx .esbuild.ts",
     "lint": "eslint src",
     "lint-staged": "eslint --max-warnings=0",
@@ -197,8 +209,8 @@
     "bump-version": "npm version patch",
     "package:marketplace": "npm run bump-version && npm run generate-marketplace-readme && vsce package --readme-path README_marketplace.md",
     "publish:marketplace": "npm run package:marketplace && vsce publish --readme-path README_marketplace.md",
-  "copy-libs": "npx cpy node_modules/chart.js/dist/chart.umd.js media/libs/",
-  "gen:ai-test-data": "tsx ai-test-data/generate_llm_classification_datasets.ts"
+    "copy-libs": "npx cpy node_modules/chart.js/dist/chart.umd.js media/libs/",
+    "gen:ai-test-data": "tsx ai-test-data/generate_llm_classification_datasets.ts"
   },
   "devDependencies": {
     "@stylistic/eslint-plugin": "^3.1.0",
@@ -216,6 +228,7 @@
     "eslint-plugin-jsdoc": "^51.4.1",
     "husky": "^9.1.7",
     "lint-staged": "^15.5.2",
+    "nodemon": "^3.1.10",
     "npm-run-all": "^4.1.5",
     "rimraf": "^6.0.1",
     "tsx": "^4.20.3",

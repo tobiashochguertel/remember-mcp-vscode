@@ -449,6 +449,13 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.window.showInformationMessage('Model usage statistics cleared.');
 	});
 
+	// Test command for progress bar
+	const testProgressUpdateCommand = vscode.commands.registerCommand('remember-mcp.testProgressUpdate', () => {
+		// This simulates a chat session update for testing the progress bar
+		usagePanelProvider.recordChatSessionUpdate();
+		vscode.window.showInformationMessage('Progress bar reset - simulated chat session update.');
+	});
+
 	// Add Copilot Usage History commands
 	const showUsageHistoryCommand = vscode.commands.registerCommand('remember-mcp.showUsageHistory', () => {
 		vscode.commands.executeCommand('workbench.view.extension.remember-mcp-container');
@@ -521,6 +528,7 @@ export function activate(context: vscode.ExtensionContext) {
 		showPanelCommand,
 		showOutputCommand,
 		clearUsageStatsCommand,
+		testProgressUpdateCommand,
 		showUsageHistoryCommand,
 		clearUsageHistoryCommand,
 		scanChatSessionsCommand,

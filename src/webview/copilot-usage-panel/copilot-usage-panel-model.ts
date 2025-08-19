@@ -3,16 +3,18 @@ import { UnifiedSessionDataService } from '../../services/unified-session-data-s
 import { ILogger } from '../../types/logger';
 import { UsageStatsViewModel } from './components/usage-stats/UsageStatsViewModel';
 import { SessionAnalysisViewModel } from './components/session-analysis/SessionAnalysisViewModel';
+import { UpdateProgressViewModel } from './components/update-progress/UpdateProgressViewModel';
 
 /**
  * Aggregator model for Copilot Usage Panel (micro-MVVM)
- * Composes micro view-models for usage stats and session analysis
+ * Composes micro view-models for usage stats, session analysis, and update progress
  */
 export class CopilotUsagePanelModel implements vscode.Disposable {
 	private _listeners: Array<() => void> = [];
 
 	public readonly usageStatsViewModel: UsageStatsViewModel;
 	public readonly sessionAnalysisViewModel: SessionAnalysisViewModel;
+	public readonly updateProgressViewModel: UpdateProgressViewModel;
 
 	constructor(
 		private readonly extensionContext: vscode.ExtensionContext,
@@ -21,10 +23,12 @@ export class CopilotUsagePanelModel implements vscode.Disposable {
 	) {
 		this.usageStatsViewModel = new UsageStatsViewModel(this.unifiedDataService, this.extensionContext, this.logger);
 		this.sessionAnalysisViewModel = new SessionAnalysisViewModel(this.unifiedDataService, this.extensionContext, this.logger);
+		this.updateProgressViewModel = new UpdateProgressViewModel(this.unifiedDataService, this.logger);
 
 		// Bubble child VM changes
 		this.usageStatsViewModel.onChanged(() => this.emit());
 		this.sessionAnalysisViewModel.onChanged(() => this.emit());
+		this.updateProgressViewModel.onChanged(() => this.emit());
 	}
 
 	public onDataChanged(listener: () => void): void {
@@ -63,9 +67,21 @@ export class CopilotUsagePanelModel implements vscode.Disposable {
 		this.sessionAnalysisViewModel.setModel(model);
 	}
 
+	// Update progress actions
+	public recordChatSessionUpdate(timestamp?: number): void {
+		this.updateProgressViewModel.recordUpdate(timestamp);
+		this.emit(); // Notify view to re-render
+	}
+
+	public resetProgress(): void {
+		this.updateProgressViewModel.reset();
+		this.emit(); // Notify view to re-render
+	}
+
 	public dispose(): void {
 		this.usageStatsViewModel.dispose();
 		this.sessionAnalysisViewModel.dispose();
+		this.updateProgressViewModel.dispose();
 		this._listeners = [];
 	}
 }
