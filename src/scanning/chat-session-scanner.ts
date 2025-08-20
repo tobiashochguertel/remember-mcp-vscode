@@ -395,8 +395,8 @@ export class ChatSessionScanner {
 				
 				const watcher = new ForceFileWatcher(
 					pattern,
-					1000,
-					0
+					0,
+					1000
 				);
 				
 				// File change handler; ForceFileWatcher already applies per-file debouncing
@@ -412,6 +412,7 @@ export class ChatSessionScanner {
 						let stats: fs.Stats | undefined;
 						try {
 							stats = await fsPromises.stat(uri.fsPath);
+							this.logger.debug(`File stats for ${uri.fsPath}: ${JSON.stringify(stats)}`);
 							const prevSize = this.fileSizes.get(uri.fsPath);
 							if (prevSize !== undefined && prevSize === stats.size) {
 								this.logger.trace(`Skipping unchanged session file (size=${stats.size}): ${uri.fsPath}`);

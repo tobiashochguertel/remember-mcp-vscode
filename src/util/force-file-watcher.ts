@@ -1,5 +1,8 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
+import { Mutex } from 'async-mutex';
+import { ILogger } from '../types/logger';
+import { ServiceContainer } from '../types/service-container';
 
 /**
  * ForceFileWatcher wraps a VS Code FileSystemWatcher and adds optional periodic forced checks
@@ -14,9 +17,11 @@ export class ForceFileWatcher implements vscode.FileSystemWatcher {
 	private forceFlushTimer?: NodeJS.Timeout;
 	private isWatching = false;
 	private disposables: vscode.Disposable[] = [];
+	private logger: ILogger = ServiceContainer.getInstance().getLogger();
     
 	// Debouncing state
 	private debounceTimers: Map<string, NodeJS.Timeout> = new Map();
+	private debounceMutex = new Mutex();
 
 	/**
      * @param globPattern Glob pattern for files to watch
@@ -25,6 +30,7 @@ export class ForceFileWatcher implements vscode.FileSystemWatcher {
      * @param ignoreCreateEvents Ignore create events
      * @param ignoreChangeEvents Ignore change events
      * @param ignoreDeleteEvents Ignore delete events
+     * @param allowedSchemes URI schemes to watch (default: ['file'] - only regular files)
      */
 	constructor(
 		private readonly globPattern: vscode.GlobPattern,
@@ -32,7 +38,8 @@ export class ForceFileWatcher implements vscode.FileSystemWatcher {
 		public readonly debounceMs: number = 0,
 		public readonly ignoreCreateEvents: boolean = false,
 		public readonly ignoreChangeEvents: boolean = false,
-		public readonly ignoreDeleteEvents: boolean = false
+		public readonly ignoreDeleteEvents: boolean = false,
+		private readonly allowedSchemes: string[] = ['file']
 	) {
 		this.watcher = vscode.workspace.createFileSystemWatcher(
 			globPattern,
@@ -42,48 +49,47 @@ export class ForceFileWatcher implements vscode.FileSystemWatcher {
 		);
 	}
 
-	// Implement FileSystemWatcher interface properties
-	readonly onDidChange: vscode.Event<vscode.Uri> = (listener: (e: vscode.Uri) => any, thisArgs?: any, disposables?: vscode.Disposable[]) => {
+	// Implement FileSystemWatcher interface properties with simple callback pattern
+	readonly onDidChange = (listener: (uri: vscode.Uri) => any): vscode.Disposable => {
 		const disposable = this.watcher.onDidChange((uri) => {
-			this.debouncedCallback(uri, [listener]);
+			if (this.isSchemeAllowed(uri)) {
+				this.debouncedCallback(uri, [listener]);
+			}
 		});
-		if (disposables) {
-			disposables.push(disposable);
-		}
 		this.disposables.push(disposable);
 		return disposable;
 	};
 
-	readonly onDidCreate: vscode.Event<vscode.Uri> = (listener: (e: vscode.Uri) => any, thisArgs?: any, disposables?: vscode.Disposable[]) => {
+	readonly onDidCreate = (listener: (uri: vscode.Uri) => any): vscode.Disposable => {
 		const disposable = this.watcher.onDidCreate((uri) => {
-			this.debouncedCallback(uri, [listener]);
+			if (this.isSchemeAllowed(uri)) {
+				this.debouncedCallback(uri, [listener]);
+			}
 		});
-		if (disposables) {
-			disposables.push(disposable);
-		}
 		this.disposables.push(disposable);
 		return disposable;
 	};
 
-	readonly onDidDelete: vscode.Event<vscode.Uri> = (listener: (e: vscode.Uri) => any, thisArgs?: any, disposables?: vscode.Disposable[]) => {
+	readonly onDidDelete = (listener: (uri: vscode.Uri) => any): vscode.Disposable => {
 		// Set up verified delete handler that checks if file actually exists
 		const disposable = this.watcher.onDidDelete(async (uri: vscode.Uri) => {
+			if (!this.isSchemeAllowed(uri)) {
+				return;
+			}
+			
 			try {
 				// Verify that the file is actually gone
 				await fs.stat(uri.fsPath);
 				// If we get here, file still exists - this is a false delete event
-				console.log(`[ForceFileWatcher] False delete event for ${uri.fsPath} - file still exists`);
+				this.logger.debug(`False delete event for ${uri.fsPath} - file still exists`);
 				return;
 			} catch {
 				// File is actually gone - this is a real delete event
-				console.log(`[ForceFileWatcher] Verified delete event for ${uri.fsPath}`);
+				this.logger.debug(`Verified delete event for ${uri.fsPath}`);
 				listener(uri);
 			}
 		});
         
-		if (disposables) {
-			disposables.push(disposable);
-		}
 		this.disposables.push(disposable);
 		return disposable;
 	};
@@ -149,32 +155,51 @@ export class ForceFileWatcher implements vscode.FileSystemWatcher {
 	}
 
 	/**
+     * Check if the URI scheme is allowed for watching
+     */
+	private isSchemeAllowed(uri: vscode.Uri): boolean {
+		return this.allowedSchemes.includes(uri.scheme);
+	}
+
+	/**
      * Debounced event handler - delays callback execution until events settle
      * If debouncing is disabled (debounceMs = 0), executes callbacks immediately
      */
 	private debouncedCallback(uri: vscode.Uri, callbacks: Array<(uri: vscode.Uri) => void>): void {
 		// If debouncing is disabled, execute immediately
 		if (this.debounceMs === 0) {
+			this.logger.debug(`Executing callback immediately for ${uri.toString()}`);
 			callbacks.forEach(callback => callback(uri));
 			return;
 		}
 
-		const key = uri.toString();
+		// Use mutex to prevent race conditions in timer management
+		this.debounceMutex.runExclusive(() => {
+			// Use fsPath for deduplication key to avoid scheme-based duplicates
+			// This way file:///path/file.json and vscode-userdata:///path/file.json 
+			// are treated as the same file
+			const key = uri.fsPath || uri.toString();
+			
+			// If we have a timer running already, it will be fired
+			// eventually and we don't need to set up a new one
+			const existingTimer = this.debounceTimers.get(key);
+			if (existingTimer) {
+				this.logger.debug(`Debounce already scheduled for ${key}`);
+				return;
+			}
+			this.logger.debug(`Register new timer for ${key}`);
         
-		// Clear existing timer for this file
-		const existingTimer = this.debounceTimers.get(key);
-		if (existingTimer) {
-			clearTimeout(existingTimer);
-		}
+			// Set new timer
+			const timer = setTimeout(() => {
+				// Execute all callbacks after debounce period
+				callbacks.forEach(callback => callback(uri));
+				this.debounceMutex.runExclusive(() => {
+					this.debounceTimers.delete(key);
+				});
+			}, this.debounceMs);
         
-		// Set new timer
-		const timer = setTimeout(() => {
-			// Execute all callbacks after debounce period
-			callbacks.forEach(callback => callback(uri));
-			this.debounceTimers.delete(key);
-		}, this.debounceMs);
-        
-		this.debounceTimers.set(key, timer);
+			this.debounceTimers.set(key, timer);
+		});
 	}
 
 	/**
@@ -184,13 +209,15 @@ export class ForceFileWatcher implements vscode.FileSystemWatcher {
 		isWatching: boolean; 
 		forceFlushInterval: number; 
 		debounceMs: number;
-		pendingDebounces: number; 
+		pendingDebounces: number;
+		allowedSchemes: string[];
 	} {
 		return {
 			isWatching: this.isWatching,
 			forceFlushInterval: this.forceFlushIntervalMs,
 			debounceMs: this.debounceMs,
-			pendingDebounces: this.debounceTimers.size
+			pendingDebounces: this.debounceTimers.size,
+			allowedSchemes: this.allowedSchemes
 		};
 	}
 }

@@ -85,6 +85,15 @@ export class CopilotUsagePanel implements vscode.WebviewViewProvider, vscode.Dis
 			case 'refresh':
 				await this.handleRefresh();
 				break;
+			case 'requestProgressUpdate':
+				// Client requesting a progress update (called every 30 seconds)
+				// This will trigger a re-render with current progress state
+				try {
+					await this._view?.render();
+				} catch (error) {
+					this.logger.error('Error rendering progress update:', error);
+				}
+				break;
 			case 'setModel':
 				try {
 					const model = typeof message.model === 'string' ? message.model : '';
@@ -96,6 +105,19 @@ export class CopilotUsagePanel implements vscode.WebviewViewProvider, vscode.Dis
 					this.logger.error('Error setting session analysis model:', error);
 					console.error('Error setting session analysis model:', error);
 					vscode.window.showErrorMessage('Failed to set session analysis model.');
+				}
+				break;
+			case 'setCopilotModel':
+				try {
+					const model = typeof message.model === 'string' ? message.model : '';
+					if (!model) { throw new Error('No model specified'); }
+					await vscode.commands.executeCommand('copilot-chat.setModel', model);
+					this.logger.info(`Copilot Chat model set to ${model}`);
+					vscode.window.showInformationMessage(`Copilot Chat model set to ${model}.`);
+				} catch (error) {
+					this.logger.error('Error setting Copilot Chat model:', error);
+					console.error('Error setting Copilot Chat model:', error);
+					vscode.window.showErrorMessage('Failed to set Copilot Chat model.');
 				}
 				break;
 			case 'toggleConsent':
@@ -204,5 +226,25 @@ export class CopilotUsagePanel implements vscode.WebviewViewProvider, vscode.Dis
 		}
 
 		this._view = null;
+	}
+
+	/**
+	 * Record a chat session update (called when chat session files are updated)
+	 */
+	public recordChatSessionUpdate(timestamp?: number): void {
+		if (this._model) {
+			this._model.recordChatSessionUpdate(timestamp);
+			this.logger.info('Chat session update recorded');
+		}
+	}
+
+	/**
+	 * Reset the progress bar (for manual testing or when needed)
+	 */
+	public resetProgress(): void {
+		if (this._model) {
+			this._model.resetProgress();
+			this.logger.info('Progress bar reset');
+		}
 	}
 }

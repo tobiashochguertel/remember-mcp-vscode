@@ -10,36 +10,65 @@
 	},
 	"tasks": [
 		{
-			"label": "npm watch",
+			"label": "npm: watch:esbuild",
 			"type": "shell",
 			"command": "npm",
 			"args": ["run", "watch:esbuild"],
+			"isBackground": true,
 			"problemMatcher": "$tsc-watch",
+			"presentation": {
+				"reveal": "never",
+				"group": "watchers"
+			}
+		},
+		{
+			"label": "npm: watch:lint",
+			"type": "shell",
+			"command": "npm",
+			"args": ["run", "watch:lint"],
 			"isBackground": true,
 			"presentation": {
 				"reveal": "never",
 				"group": "watchers"
-			},
-			"group": {
-				"kind": "build",
-				"isDefault": true
 			}
 		},
 		{
-			"label": "npm compile",
+			"label": "npm: watch:typecheck",
 			"type": "shell",
 			"command": "npm",
-			"args": ["run", "compile"],
+			"args": ["run", "watch:typecheck"],
+			"isBackground": true,
+			"problemMatcher": "$tsc-watch",
+			"presentation": {
+				"reveal": "never",
+				"group": "watchers"
+			}
+		},
+		{
+			"label": "start-watch-tasks",
+			"dependsOn": [
+				"npm: watch:esbuild",
+				"npm: watch:lint"
+			],
+			"dependsOrder": "parallel",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"presentation": {
+				"reveal": "never"
+			}
+		},
+		{
+			"type": "npm",
+			"script": "compile",
 			"group": "build",
 			"problemMatcher": "$tsc"
 		},
 		{
-			"label": "npm lint",
-			"type": "shell",
-			"command": "npm",
-			"args": ["run", "lint"],
+			"type": "npm",
+			"script": "lint",
 			"group": "build"
-		},
-		
+		}
 	]
 }

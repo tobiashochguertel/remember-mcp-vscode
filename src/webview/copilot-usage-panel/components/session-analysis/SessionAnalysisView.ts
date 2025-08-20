@@ -2,10 +2,11 @@ export class SessionAnalysisView {
 	render(state: { enabled: boolean; model: string; status: 'idle' | 'running' | 'disabled'; analysisSummary?: { latestSessionId: string; latestTimestamp: number; totalTurns: number; totalToolCallRounds: number; lastUserPromptPreview?: string; lastResponseChars: number }; lastAnalysisResult?: { primaryPattern: string; confidence: number; reasons?: string[] } }): string {
 		return `
 		<section class="card">
-			<h2>Session analysis (GitHub Models)</h2>
+			<h2>AI assisted analysis (Active session)</h2>
 			<div class="summary">Status: ${state.status} • Model: ${state.model}</div>
 			<div class="actions">
 				<button id="btnRunOnce">Run once</button>
+				<button id="btnSwitchGTP5">Switch to GTP-5</button>
 			</div>
 			${this.renderResults(state)}
 		</section>`;
@@ -48,11 +49,13 @@ export class SessionAnalysisView {
 
 	getClientInitScript(): string {
 		return `
-		(function(){
-			const runBtn = document.getElementById('btnRunOnce');
-			if (runBtn) runBtn.addEventListener('click', () => sendMessage('runNow'));
-		})();
-		`;
+			(function(){
+				const runBtn = document.getElementById('btnRunOnce');
+				if (runBtn) runBtn.addEventListener('click', () => sendMessage('runNow'));
+				const switchBtn = document.getElementById('btnSwitchGTP5');
+				if (switchBtn) switchBtn.addEventListener('click', () => sendMessage('setCopilotModel', { model: 'GTP-5' }));
+			})();
+			`;
 	}
 
 	private renderResults(state: { analysisSummary?: { latestSessionId: string; latestTimestamp: number; totalTurns: number; totalToolCallRounds: number; lastUserPromptPreview?: string; lastResponseChars: number }; lastAnalysisResult?: { primaryPattern: string; confidence: number; reasons?: string[] } }): string {
@@ -68,7 +71,7 @@ export class SessionAnalysisView {
 			const result = state.lastAnalysisResult;
 			const indicator = this.getConfidenceIndicator(result.confidence);
 			const confidencePercent = Math.round(result.confidence * 100);
-			
+
 			// Format reasons if available
 			let reasonsHtml = '';
 			if (result.reasons && result.reasons.length > 0) {
