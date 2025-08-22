@@ -17,8 +17,10 @@ export interface Kpis {
 	sessions: number;
 	files: number;
 	edits: number;
+	fileModifications: number; // NEW: Total individual file edits made
 	latencyMsMedian: number;
 	editRatio: number;
+	editProductivity: number; // NEW: Average file modifications per edit turn
 	models: number;
 	agents: number;
 	requests: number;
@@ -62,6 +64,16 @@ export class AnalyticsService {
 	private unified: UnifiedSessionDataService;
 	// Subscribers to analytics updates
 	private analyticsCallbacks: Array<() => void> = [];
+
+	/**
+	 * ANALYTICS PHILOSOPHY:
+	 * - HISTORY PANEL: Measures "what actually happened" (action-based metrics)
+	 *   - Edit detection based on actual file modifications, not user intent
+	 *   - Provides performance metrics for model effectiveness
+	 * - USAGE PANEL: Could measure "how you use Copilot" (intent-based metrics)
+	 *   - Agent/mode-based detection for behavioral insights
+	 *   - Useful for usage optimization recommendations
+	 */
 
 	constructor(logger: ILogger, unified: UnifiedSessionDataService) {
 		this.logger = logger;
@@ -114,12 +126,27 @@ export class AnalyticsService {
 		const latencyMsMedian = this.median(latencies) ?? 0;
 		const requests = turns.reduce((sum, r) => sum + (Array.isArray(r.modelRequests) ? r.modelRequests.length : 0), 0);
 
-		// edits approximation: count requests with mode 'edit'
+		// ACTION-BASED edit counting: measures actual model performance ("what happened")
+		// For history analysis, we count actual file modifications, not user intent
 		const edits = turns.filter(r => r.type === 'edit').length;
+		const fileModifications = turns.reduce((sum, r) => sum + (r.fileModifications || 0), 0);
 		const turnCount = turns.length;
 		const editRatio = turnCount > 0 ? edits / turnCount : 0;
+		const editProductivity = edits > 0 ? fileModifications / edits : 0;
 
-		return { turns: turnCount, sessions, files, edits, latencyMsMedian, editRatio, models, agents, requests: requests };
+		return { 
+			turns: turnCount, 
+			sessions, 
+			files, 
+			edits, 
+			fileModifications,
+			latencyMsMedian, 
+			editRatio, 
+			editProductivity,
+			models, 
+			agents, 
+			requests: requests 
+		};
 	}
 
 	getAgents(filter?: AnalyticsFilter, limit = 5): AgentStat[] {
@@ -289,8 +316,13 @@ export class AnalyticsService {
 	private mapTurn(turn: CopilotChatTurn, sessionId: string, workspaceId?: string) {
 		const timestamp = new Date(turn.timestamp);
 		const modes = Array.isArray(turn.modes) ? turn.modes : [];
-		const type = modes[0] || 'ask';
 		const agent = turn.agent?.id || undefined;
+		
+		// ACTION-BASED edit detection: "What actually happened"
+		// For history analysis, we measure actual model performance, not user intent
+		const type = this.hasFileEdits(turn) ? 'edit' : (modes[0] || 'ask');
+		const fileModifications = this.countFileModifications(turn);
+		
 		const model = turn.modelId || undefined;
 		const latencyMs = turn.result?.timings?.totalElapsed;
 		const turnId = turn.responseId || turn.turnId;
@@ -312,7 +344,29 @@ export class AnalyticsService {
 			turnId,
 			language,
 			modelRequests,
+			fileModifications, // NEW: individual file edit count
 		};
+	}
+
+	private hasFileEdits(turn: CopilotChatTurn): boolean {
+		const responses = turn.response || [];
+		for (const resp of responses) {
+			if (resp && resp.kind === 'codeblockUri' && resp.isEdit) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private countFileModifications(turn: CopilotChatTurn): number {
+		let count = 0;
+		const responses = turn.response || [];
+		for (const resp of responses) {
+			if (resp && resp.kind === 'codeblockUri' && resp.isEdit) {
+				count++;
+			}
+		}
+		return count;
 	}
 
 	private normalizePath(path: string | undefined): string | undefined {

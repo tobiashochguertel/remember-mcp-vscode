@@ -38,8 +38,10 @@ export class KpiChipsViewModel {
 			{ id: 'requests', label: 'Requests', value: kpis.requests.toString(), tooltip: 'Total model/tool request rounds executed by Copilot' },
 			{ id: 'files', label: 'Files', value: kpis.files.toString(), tooltip: 'Unique files referenced across all turns' },
 			{ id: 'edits', label: 'Edits', value: kpis.edits.toString(), tooltip: 'Number of edit-type turns (code changes suggested/applied)' },
-			{ id: 'latencyMsMedian', label: 'Median Latency (ms)', value: Math.round(kpis.latencyMsMedian).toString(), tooltip: 'Median end-to-end latency per turn (milliseconds)' },
 			{ id: 'editRatio', label: 'Edit Ratio', value: (kpis.editRatio * 100).toFixed(1) + '%', tooltip: 'Share of turns that were edits (edits ÷ turns)' },
+			{ id: 'fileModifications', label: 'File Mods', value: kpis.fileModifications.toString(), tooltip: 'Total individual file modifications made across all edit turns' },
+			{ id: 'editProductivity', label: 'Edit Productivity', value: kpis.editProductivity.toFixed(1), tooltip: 'Average file modifications per edit turn (file mods ÷ edit turns)' },
+			{ id: 'latencyMsMedian', label: 'Median Latency (ms)', value: Math.round(kpis.latencyMsMedian).toString(), tooltip: 'Median end-to-end latency per turn (milliseconds)' },
 			{ id: 'models', label: 'Models', value: kpis.models.toString(), tooltip: 'Unique AI models used' },
 			{ id: 'agents', label: 'Agents', value: kpis.agents.toString(), tooltip: 'Unique Copilot agents used' }
 		];
