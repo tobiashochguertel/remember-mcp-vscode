@@ -96,7 +96,18 @@ export class AnalyticsService {
 	getKpis(filter?: AnalyticsFilter): Kpis {
 		const turns = this.applyFilterToTurns(this.flattenTurns(), filter);
 		const sessions = new Set(turns.map(r => r.sessionId)).size;
-		const files = new Set(turns.map(r => r.filePath).filter(Boolean)).size;
+		
+		// NEW: Comprehensive file reference counting
+		const allFileReferences = new Set<string>();
+		for (const turn of turns) {
+			if (Array.isArray(turn.allFileReferences)) {
+				for (const ref of turn.allFileReferences) {
+					allFileReferences.add(ref);
+				}
+			}
+		}
+		const files = allFileReferences.size;
+		
 		const models = new Set(turns.map(r => r.model).filter(Boolean)).size;
 		const agents = new Set(turns.map(r => r.agent).filter(Boolean)).size;
 		const latencies = turns.map(r => r.latencyMs).filter((v): v is number => typeof v === 'number' && !isNaN(v));
@@ -284,7 +295,8 @@ export class AnalyticsService {
 		const latencyMs = turn.result?.timings?.totalElapsed;
 		const turnId = turn.responseId || turn.turnId;
 		const modelRequests = turn.result?.metadata?.toolCallRounds || [];
-		const filePath = this.extractFirstFilePath(turn);
+		const allFileReferences = this.extractAllFileReferences(turn);
+		const filePath = this.extractFirstFilePath(turn); // Keep for backward compatibility
 		const language = this.inferLanguage(turn);
 		return {
 			// Core
@@ -295,6 +307,7 @@ export class AnalyticsService {
 			agent,
 			model,
 			filePath,
+			allFileReferences, // NEW: comprehensive file reference list
 			latencyMs,
 			turnId,
 			language,
@@ -302,16 +315,95 @@ export class AnalyticsService {
 		};
 	}
 
-	private extractFirstFilePath(req: CopilotChatTurn): string | undefined {
-		const refs = req.contentReferences || [];
-		for (const r of refs) {
-			const ref = (r as any).reference || {};
+	private normalizePath(path: string | undefined): string | undefined {
+		if (!path || typeof path !== 'string' || path.trim().length === 0) {
+			return undefined;
+		}
+		
+		let normalized = path.trim();
+		
+		// Remove file:// prefix if present
+		normalized = normalized.replace(/^file:\/\//, '');
+		
+		// URL decode
+		try {
+			normalized = decodeURIComponent(normalized);
+		} catch {
+			// If decode fails, continue with original
+		}
+		
+		// Convert /c:/path to c:/path (Windows URI format)
+		normalized = normalized.replace(/^\/([A-Za-z]:)/, '$1');
+		
+		// Normalize slashes to forward slashes
+		normalized = normalized.replace(/\\/g, '/');
+		
+		// Lowercase Windows drive letters for consistent deduplication
+		if (/^[A-Z]:/.test(normalized)) {
+			normalized = normalized[0].toLowerCase() + normalized.slice(1);
+		}
+		
+		return normalized;
+	}
+
+	private extractAllFileReferences(turn: CopilotChatTurn): string[] {
+		const paths = new Set<string>();
+		
+		// 1. contentReferences[].reference paths
+		const contentRefs = turn.contentReferences || [];
+		for (const cr of contentRefs) {
+			const ref = (cr as any).reference || {};
 			const p = ref.fsPath || ref.path || ref.uri || ref.external;
-			if (typeof p === 'string' && p.trim().length > 0) {
-				return p;
+			const normalized = this.normalizePath(p);
+			if (normalized) {
+				paths.add(normalized);
 			}
 		}
-		return undefined;
+		
+		// 2. variableData.variables[kind=file].value.uri paths
+		const variables = turn.variableData?.variables || [];
+		for (const variable of variables) {
+			if (variable && variable.kind === 'file' && variable.value?.uri) {
+				const uri = variable.value.uri;
+				const p = uri.fsPath || uri.path || uri.external || uri.uri;
+				const normalized = this.normalizePath(p);
+				if (normalized) {
+					paths.add(normalized);
+				}
+			}
+		}
+		
+		// 3. response[].codeblockUri with isEdit=false
+		const responses = turn.response || [];
+		for (const resp of responses) {
+			if (resp && resp.kind === 'codeblockUri' && resp.uri && !resp.isEdit) {
+				const p = resp.uri.fsPath || resp.uri.path || resp.uri.external;
+				const normalized = this.normalizePath(p);
+				if (normalized) {
+					paths.add(normalized);
+				}
+			}
+		}
+		
+		// 4. result.metadata.codeBlocks[].resource.path (when present)
+		const codeBlocks = turn.result?.metadata?.codeBlocks || [];
+		for (const block of codeBlocks) {
+			if (block && block.resource) {
+				const p = block.resource.fsPath || block.resource.path || block.resource.external;
+				const normalized = this.normalizePath(p);
+				if (normalized) {
+					paths.add(normalized);
+				}
+			}
+		}
+		
+		return Array.from(paths);
+	}
+
+	private extractFirstFilePath(req: CopilotChatTurn): string | undefined {
+		// Legacy method - now returns first from comprehensive extraction for backward compatibility
+		const allRefs = this.extractAllFileReferences(req);
+		return allRefs.length > 0 ? allRefs[0] : undefined;
 	}
 
 	private inferLanguage(req: CopilotChatTurn): string | undefined {
