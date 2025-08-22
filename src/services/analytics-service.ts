@@ -397,6 +397,67 @@ export class AnalyticsService {
 			}
 		}
 		
+		// 5. response[].uri paths (deliberate file operations)
+		for (const resp of responses) {
+			if (resp && resp.uri) {
+				const p = resp.uri.fsPath || resp.uri.path || resp.uri.external;
+				const normalized = this.normalizePath(p);
+				if (normalized) {
+					paths.add(normalized);
+				}
+			}
+		}
+		
+		// 6. response[].inlineReference paths (VS Code structured references)
+		for (const resp of responses) {
+			if (resp && resp.inlineReference) {
+				const ref = resp.inlineReference;
+				const p = ref.fsPath || ref.path || ref.external || 
+						 ref.location?.uri?.fsPath || ref.location?.uri?.path || ref.location?.uri?.external;
+				const normalized = this.normalizePath(p);
+				if (normalized) {
+					paths.add(normalized);
+				}
+			}
+		}
+		
+		// 7. variableData.variables[].value with URI properties (extend beyond just kind=file)
+		for (const variable of variables) {
+			if (variable && variable.value) {
+				// Check for direct URI properties in any variable
+				const uri = variable.value.uri || variable.value;
+				if (uri && typeof uri === 'object') {
+					const p = uri.fsPath || uri.path || uri.external;
+					const normalized = this.normalizePath(p);
+					if (normalized) {
+						paths.add(normalized);
+					}
+				}
+			}
+		}
+		
+		// 8. response[].invocationMessage.uris and pastTenseMessage.uris (tool invocation files)
+		for (const resp of responses) {
+			if (resp && resp.invocationMessage?.uris) {
+				Object.values(resp.invocationMessage.uris).forEach((uri: any) => {
+					const p = uri.path || uri.fsPath || uri.external;
+					const normalized = this.normalizePath(p);
+					if (normalized) {
+						paths.add(normalized);
+					}
+				});
+			}
+			if (resp && resp.pastTenseMessage?.uris) {
+				Object.values(resp.pastTenseMessage.uris).forEach((uri: any) => {
+					const p = uri.path || uri.fsPath || uri.external;
+					const normalized = this.normalizePath(p);
+					if (normalized) {
+						paths.add(normalized);
+					}
+				});
+			}
+		}
+		
 		return Array.from(paths);
 	}
 
