@@ -50,7 +50,7 @@ export class ActivityFeedView extends ComponentBase {
 	/**
 	 * Render the activity feed HTML
 	 */
-	protected render(): string {
+	public render(): string {
 		const state = this.viewModel.getState();
 
 		if (!state.items.length) {

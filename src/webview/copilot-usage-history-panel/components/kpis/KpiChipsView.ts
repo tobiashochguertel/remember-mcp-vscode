@@ -44,7 +44,7 @@ export class KpiChipsView extends ComponentBase {
 	/**
 	 * Render the KPI chips HTML
 	 */
-	protected render(): string {
+	public render(): string {
 		const vmState = this.viewModel.getState();
 		const state: KpiChipsRenderState = {
 			chips: vmState.chips.map(c => ({ label: c.label, value: c.value, tooltip: c.tooltip })),

@@ -8,7 +8,7 @@ import { AgentsListView } from './components/agents/AgentsListView';
 import { ModelsListView } from './components/models/ModelsListView';
 import { ActivityFeedView } from './components/activity/ActivityFeedView';
 import { DailyRequestsChartView } from './components/charts/DailyRequestsChartView';
-import { IComponent, ComponentMessage } from './components/shared/ComponentBase';
+import { ComponentMessage } from './components/shared/ComponentBase';
 import { InsightsView } from './components/insights/InsightsView';
 
 /**
@@ -16,7 +16,14 @@ import { InsightsView } from './components/insights/InsightsView';
  * Manages component lifecycle and coordinates updates between model and view
  */
 export class CopilotUsageHistoryView {
-	private readonly components: IComponent[] = [];
+	// Get component references for direct rendering
+	private readonly kpisComponent: KpiChipsView;
+	private readonly filtersComponent: FiltersView;
+	private readonly agentsComponent: AgentsListView;
+	private readonly modelsComponent: ModelsListView;
+	private readonly activityComponent: ActivityFeedView;
+	private readonly insightsComponent: InsightsView;
+	private readonly chartComponent: DailyRequestsChartView;
 	private _disposables: vscode.Disposable[] = [];
 
 	constructor(
@@ -26,15 +33,13 @@ export class CopilotUsageHistoryView {
 		private readonly _logger: ILogger
 	) {
 		// Initialize components with the webview and model
-		this.components.push(
-			new FiltersView(this._webview, this._model, this._logger),
-			new KpiChipsView(this._webview, this._model, this._logger),
-			new DailyRequestsChartView(this._webview, this._model, this._logger),
-			new AgentsListView(this._webview, this._model, this._logger),
-			new ModelsListView(this._webview, this._model, this._logger),
-			new ActivityFeedView(this._webview, this._model, this._logger),
-			new InsightsView(this._webview, this._model, this._logger),
-		);
+		this.kpisComponent = new KpiChipsView(this._webview, this._model, this._logger);
+		this.filtersComponent = new FiltersView(this._webview, this._model, this._logger);
+		this.agentsComponent = new AgentsListView(this._webview, this._model, this._logger);
+		this.modelsComponent = new ModelsListView(this._webview, this._model, this._logger);
+		this.activityComponent = new ActivityFeedView(this._webview, this._model, this._logger);
+		this.insightsComponent = new InsightsView(this._webview, this._model, this._logger);
+		this.chartComponent = new DailyRequestsChartView(this._webview, this._model, this._logger);
 
 		// Set up data binding: model changes update the view (for non-PostMessage components)
 		this._model.onDataChanged(async () => {
@@ -49,13 +54,28 @@ export class CopilotUsageHistoryView {
 	}
 
 	/**
+	 * Get all components for iteration
+	 */
+	private getAllComponents() {
+		return [
+			this.kpisComponent,
+			this.filtersComponent,
+			this.agentsComponent,
+			this.modelsComponent,
+			this.activityComponent,
+			this.insightsComponent,
+			this.chartComponent
+		];
+	}
+
+	/**
 	 * Route a message to the appropriate component(s)
 	 */
 	public async handleMessage(message: ComponentMessage): Promise<void> {
 		this._logger.debug?.('Routing message to components:', message.type);
 		
 		// Route to all components - each decides if it handles the message
-		for (const component of this.components) {
+		for (const component of this.getAllComponents()) {
 			try {
 				const handled = await component.handleMessage(message);
 				if (handled) {
@@ -81,10 +101,6 @@ export class CopilotUsageHistoryView {
 		const html = await this.generateHtml();
 		this._webview.html = html;
 		
-		// CRITICAL: After setting HTML, trigger all components to update their containers
-		// This fixes the race condition where components tried to update before containers existed
-		await this.refreshComponentViews();
-		
 		const shouldShowToolbar = this._model.hasData();
 		await this.updateToolbarVisibility(shouldShowToolbar);
 	}
@@ -97,15 +113,15 @@ export class CopilotUsageHistoryView {
 		this._logger.trace('Refreshing all component views after HTML update');
 		
 		// Force each component to re-render by triggering their state change handlers
-		// This ensures the PostMessage updates are sent to existing DOM containers
-		for (const component of this.components) {
+		// For now, we'll send a refresh message to each component
+		for (const component of this.getAllComponents()) {
 			try {
 				// Trigger component update by calling their onStateChanged equivalent
 				// For now, we'll send a refresh message to each component
 				const refreshMessage = { type: 'component-refresh' };
 				await component.handleMessage(refreshMessage);
 			} catch (error) {
-				this._logger.error(`Error refreshing component ${component.componentId}:`, error);
+				this._logger.error('Error refreshing component:', error);
 			}
 		}
 	}
@@ -130,19 +146,24 @@ export class CopilotUsageHistoryView {
 	}
 
 	/**
-	 * Generate complete HTML content using component placeholders
+	 * Generate complete HTML content using direct component rendering
 	 */
 	private async generateHtml(): Promise<string> {
 		if (!this._model.hasData()) {
 			return await this.generateSimpleNoDataHtml();
 		}
 
+		// Render all components directly
+		const kpisHTML = await this.kpisComponent.render();
+		const filtersHTML = await this.filtersComponent.render();
+		const modelsHTML = await this.modelsComponent.render();
+		const agentsHTML = await this.agentsComponent.render();
+		const activityHTML = await this.activityComponent.render();
+		const insightsHTML = await this.insightsComponent.render();
+		const chartHTML = await this.chartComponent.render();
+
 		const chartJsUri = this.getChartJsUri();
 		const styles = await this.getWebviewStyles();
-		const sharedScript = WebviewUtils.getSharedScript();
-
-		// Generate placeholders for all components
-		const componentPlaceholders = this.generateComponentPlaceholders();
 
 		return `<!DOCTYPE html>
 		<html lang="en">
@@ -152,53 +173,71 @@ export class CopilotUsageHistoryView {
 			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'unsafe-eval' vscode-resource:; font-src 'self' data:;">
 			<title>Copilot Usage History</title>
 			<script src="${chartJsUri}"></script>
-			${sharedScript}
 			${styles}
 		</head>
 		<body>
-
-			${componentPlaceholders}
+			${kpisHTML}
+			${filtersHTML}
+			${modelsHTML}
+			${agentsHTML}
+			${activityHTML}
+			${insightsHTML}
+			${chartHTML}
 			
-			${this.generateClientScript()}
+			<script>
+			// Generic message handling using data attributes
+			if (!window.vscode) { window.vscode = acquireVsCodeApi(); }
+
+			function sendMessage(command, data) {
+				const payload = { type: command, command }; 
+				if (data && typeof data === 'object') {
+					Object.assign(payload, data);
+				}
+				window.vscode.postMessage(payload);
+			}
+
+			// Expose globally
+			window.sendMessage = sendMessage;
+
+			// Generic event handling based on data attributes
+			document.addEventListener('change', function(event) {
+				const target = event.target;
+				const action = target.getAttribute('data-action');
+				const component = target.getAttribute('data-component');
+				
+				if (action && component) {
+					sendMessage('componentMessage', {
+						component: component,
+						action: action,
+						data: {
+							value: target.value,
+							id: target.id,
+							name: target.name
+						}
+					});
+				}
+			});
+			
+			document.addEventListener('click', function(event) {
+				const target = event.target;
+				const action = target.getAttribute('data-action');
+				const component = target.getAttribute('data-component');
+				
+				if (action && component) {
+					sendMessage('componentMessage', {
+						component: component,
+						action: action,
+						data: {
+							value: target.value,
+							id: target.id,
+							name: target.name
+						}
+					});
+				}
+			});
+			</script>
 		</body>
 		</html>`;
-	}
-
-	/**
-	 * Generate placeholder containers for all PostMessage components
-	 */
-	private generateComponentPlaceholders(): string {
-		return this.components.map(component => {
-			const sectionClass = this.getSectionClassForComponent(component.componentId);
-			return `<section class="${sectionClass}" aria-label="${this.getAriaLabelForComponent(component.componentId)}">
-				<div id="${component.componentId}" class="component-container">
-					<!-- Component content will be populated via PostMessage -->
-				</div>
-			</section>`;
-		}).join('\n');
-	}
-
-	/**
-	 * Get appropriate section CSS class for a component
-	 */
-	private getSectionClassForComponent(_componentId: string): string {
-		return 'panel-section';
-	}
-
-	/**
-	 * Get appropriate aria-label for a component
-	 */
-	private getAriaLabelForComponent(componentId: string): string {
-		switch (componentId) {
-			case 'filters-container': return 'Filters';
-			case 'kpi-chips-container': return 'Key metrics';
-			case 'agents-list-container': return 'Agents list';
-			case 'models-list-container': return 'Models list';
-			case 'activity-feed-container': return 'Activity feed';
-			case 'daily-requests-chart-container': return 'Daily requests chart';
-			case 'insights-container': return 'Insights';
-			default: return componentId.replace('-container', '').replace('-', ' ');
-		}
 	}
 
 	/**
@@ -208,143 +247,6 @@ export class CopilotUsageHistoryView {
 		return this._webview.asWebviewUri(
 			vscode.Uri.joinPath(this._extensionUri, 'media', 'chart.umd.js')
 		).toString();
-	}
-
-	/**
-	 * Generate daily requests chart section using legacy component (TODO: convert)
-	 */
-	private generateDailyRequestsChartSection(): string {
-		const vm = this._model.dailyRequestsChartViewModel;
-		const vmState = vm.getState();
-		
-		if (vmState.isLoading) {
-			return '<section class="panel-section" aria-label="Daily requests chart"><div class="summary">Loading chart...</div></section>';
-		}
-		
-		if (vmState.isEmpty) {
-			return '<section class="panel-section" aria-label="Daily requests chart"><div class="summary">No chart data available</div></section>';
-		}
-
-		// Legacy chart rendering (simplified)
-		return `
-			<section class="panel-section" aria-label="Daily requests chart">
-				<h3>Daily Requests</h3>
-				<div class="chart-container">
-					<canvas id="dailyRequestsChart" width="400" height="200"></canvas>
-				</div>
-			</section>
-		`;
-	}
-
-	/**
-	 * Generate agents section using legacy component (TODO: convert)
-	 */
-	private generateAgentsSection(): string {
-		const vm = this._model.agentsListViewModel;
-		const vmState = vm.getState();
-		
-		if (vmState.isLoading) {
-			return '<section class="panel-section" aria-label="Agents"><div class="summary">Loading agents...</div></section>';
-		}
-
-		return `
-			<section class="panel-section" aria-label="Agents">
-				<h3>Agents</h3>
-				<div class="agents-list">
-					${vmState.items.map(item => `<div class="agent-item">${item.id}: ${item.count} requests</div>`).join('')}
-				</div>
-			</section>
-		`;
-	}
-
-	/**
-	 * Generate models section using legacy component (TODO: convert)
-	 */
-	private generateModelsSection(): string {
-		const vmState = this._model.modelsListViewModel.getState();
-		
-		return `
-			<section class="panel-section" aria-label="Models">
-				<h3>Models</h3>
-				<div class="models-list">
-					${vmState.items.map(item => `<div class="model-item">${item.id}: ${item.count} requests</div>`).join('')}
-				</div>
-			</section>
-		`;
-	}
-
-	/**
-	 * Generate activity section using legacy component (TODO: convert)
-	 */
-	private generateActivitySection(): string {
-		const vmState = this._model.activityFeedViewModel.getState();
-		
-		return `
-			<section class="panel-section" aria-label="Activity">
-				<h3>Recent Activity</h3>
-				<div class="activity-list">
-					${vmState.items.map(item => `<div class="activity-item">${item.timeISO}: ${item.type} (${item.agent})</div>`).join('')}
-				</div>
-			</section>
-		`;
-	}
-
-	/**
-	 * Generate client-side scripts for all components
-	 */
-	private generateClientScript(): string {
-		// Collect client scripts from components
-		const componentScripts = this.components
-			.map(c => c.getClientScript?.() || '')
-			.filter(s => s.trim().length > 0)
-			.join('\n');
-
-		return `
-			<script>
-			(function() {
-				if (!window.vscode) { window.vscode = acquireVsCodeApi(); }
-
-				function sendMessage(command, data) {
-					// Send both type and command for compatibility
-					const payload = { type: command, command }; 
-					if (data && typeof data === 'object') {
-						Object.assign(payload, data);
-					}
-					window.vscode.postMessage(payload);
-				}
-
-				// Expose globally
-				window.sendMessage = sendMessage;
-
-				// PostMessage handler for component updates
-				window.addEventListener('message', event => {
-					const message = event.data;
-					if (message.type === 'component-update') {
-						const element = document.getElementById(message.componentId);
-						if (element) {
-							element.innerHTML = message.html;
-							
-							// Execute any script tags that were just inserted
-							const scripts = element.querySelectorAll('script');
-							scripts.forEach(script => {
-								const newScript = document.createElement('script');
-								if (script.src) {
-									newScript.src = script.src;
-								} else {
-									newScript.textContent = script.textContent;
-								}
-								// Replace the old script with new executable script
-								script.parentNode.replaceChild(newScript, script);
-							});
-						}
-					}
-				});
-
-				// Initialize component scripts
-				${componentScripts}
-			})();
-			</script>
-		`;
 	}
 
 	/**
@@ -506,6 +408,6 @@ export class CopilotUsageHistoryView {
 		this._disposables = [];
 
 		// Dispose of all components
-		this.components.forEach(component => component.dispose());
+		this.getAllComponents().forEach(component => component.dispose());
 	}
 }

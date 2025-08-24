@@ -54,7 +54,7 @@ export class DailyRequestsChartView extends ComponentBase {
 	/**
 	 * Render the daily requests chart HTML
 	 */
-	protected render(): string {
+	public render(): string {
 		const vmState = this.viewModel.getState();
 
 		if (vmState.isLoading) {

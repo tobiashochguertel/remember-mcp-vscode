@@ -14,14 +14,19 @@ export interface ComponentMessage {
 }
 
 /**
- * Component interface for the new architecture
- * Each component manages its own lifecycle, rendering, and message handling
+ * Component interface for simplified architecture
+ * Components render HTML directly and handle their own messages
  */
 export interface IComponent {
 	/**
-	 * Unique identifier for this component's DOM container
+	 * Unique identifier for this component
 	 */
 	readonly componentId: string;
+
+	/**
+	 * Render the component's HTML directly
+	 */
+	render(): string;
 
 	/**
 	 * Handle messages from the webview that are relevant to this component
@@ -29,11 +34,6 @@ export interface IComponent {
 	 * @returns true if the message was handled, false otherwise
 	 */
 	handleMessage(message: ComponentMessage): Promise<boolean>;
-
-	/**
-	 * Get client-side JavaScript for this component (if needed)
-	 */
-	getClientScript?(): string;
 
 	/**
 	 * Dispose of the component and clean up subscriptions
@@ -48,51 +48,21 @@ export abstract class ComponentBase implements IComponent {
 	protected _disposables: vscode.Disposable[] = [];
 
 	constructor(
-		protected readonly webview: vscode.Webview,
 		public readonly componentId: string
 	) {}
 
-	async handleMessage(message: ComponentMessage): Promise<boolean> {
-		// Handle common messages that all components should respond to
-		if (message.type === 'component-refresh') {
-			this.refreshView();
-			return true;
-		}
-		
-		// Delegate to component-specific message handling
-		return await this.handleComponentMessage(message);
+	/**
+	 * Render the component's HTML directly
+	 */
+	abstract render(): string;
+
+	/**
+	 * Handle messages - components can override this for their specific logic
+	 */
+	async handleMessage(_message: ComponentMessage): Promise<boolean> {
+		// Default implementation does nothing
+		return false;
 	}
-
-	/**
-	 * Component-specific message handling - override this instead of handleMessage
-	 */
-	protected abstract handleComponentMessage(message: ComponentMessage): Promise<boolean>;
-
-	/**
-	 * Force the component to refresh its view
-	 */
-	protected refreshView(): void {
-		const html = this.render();
-		this.updateView(html);
-	}
-
-	/**
-	 * Update this component's HTML in the webview via PostMessage
-	 */
-	protected updateView(html: string): void {
-		this.webview.postMessage({
-			type: 'component-update',
-			componentId: this.componentId,
-			html: html
-		});
-	}
-
-	/**
-	 * Render the component's HTML - now protected since components update themselves
-	 */
-	protected abstract render(): string;
-
-	getClientScript?(): string;
 
 	dispose(): void {
 		this._disposables.forEach(d => d.dispose());

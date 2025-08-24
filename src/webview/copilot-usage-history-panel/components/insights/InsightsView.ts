@@ -28,7 +28,7 @@ export class InsightsView extends ComponentBase {
 		return false;
 	}
 
-	protected render(): string {
+	public render(): string {
 		// Simple static insights for now
 		const items: InsightItem[] = [
 			{ text: 'Insights will be populated when data is available.' }

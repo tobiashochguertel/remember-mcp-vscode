@@ -108,13 +108,24 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 		this.logger.info(`Received message: ${msgType}`);
 
 		try {
-			// Handle component-rendered messages
+			// Handle component messages with new format
+			if (msgType === 'componentMessage' && message.component && message.action) {
+				await this._view.handleMessage({
+					type: msgType,
+					component: message.component,
+					action: message.action,
+					data: message.data
+				});
+				return;
+			}
+
+			// Handle component-rendered messages (legacy)
 			if (msgType === 'component-rendered' && message.componentId && message.html) {
 				this.sendComponentUpdate(message.componentId, message.html);
 				return;
 			}
 
-			// First try to route to components
+			// First try to route to components (legacy)
 			if (msgType) {
 				const componentMessage = { ...message, type: msgType };
 				await this._view.handleMessage(componentMessage);

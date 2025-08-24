@@ -48,7 +48,7 @@ export class AgentsListView extends ComponentBase {
 	/**
 	 * Render the agents list HTML
 	 */
-	protected render(): string {
+	public render(): string {
 		const state = this.viewModel.getState();
 
 		if (state.isLoading) {

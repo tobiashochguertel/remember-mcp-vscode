@@ -25,75 +25,63 @@ export class FiltersView extends ComponentBase {
 	private viewModel: FiltersViewModel;
 
 	constructor(
-		webview: vscode.Webview,
+		private webview: vscode.Webview,
 		private model: CopilotUsageHistoryModel,
 		private logger: ILogger
 	) {
-		super(webview, 'filters-container');
+		super('filters-container');
 		this.viewModel = this.model.filtersViewModel;
 
-		// Subscribe to model changes
+		// Subscribe to model changes - but we don't need onStateChanged anymore
+		// since we render directly when requested
 		this._disposables.push({
 			dispose: this.viewModel.subscribe(() => {
-				this.onStateChanged();
+				// Component will be re-rendered when the view calls render()
 			})
 		});
-
-		// Don't send initial content immediately - wait for refreshComponentViews()
-		// this.onStateChanged();
 	}
 
 	/**
 	 * Handle messages related to filtering
 	 */
-	protected async handleComponentMessage(message: ComponentMessage): Promise<boolean> {
-		switch (message.type) {
+	public async handleMessage(message: ComponentMessage): Promise<boolean> {
+		if (message.component !== 'filters') {
+			return false;
+		}
+
+		switch (message.action) {
 			case 'applyFilter':
-				await this.handleApplyFilter(message);
+				if (message.data?.id && message.data?.value !== undefined) {
+					// Map the element ID to the filter property
+					const filterMap: { [key: string]: keyof FiltersState } = {
+						'flt_time': 'timeRange',
+						'flt_ws': 'workspace', 
+						'flt_agent': 'agentId',
+						'flt_model': 'modelId'
+					};
+					
+					const filterProperty = filterMap[message.data.id];
+					if (filterProperty) {
+						const patch: Partial<FiltersState> = {};
+						patch[filterProperty] = message.data.value || undefined;
+						this.viewModel.handle({ type: 'applyFilter', patch });
+					}
+				}
 				return true;
+				
 			case 'refresh':
-				await this.handleRefresh();
+				this.viewModel.handle({ type: 'refresh' });
 				return true;
+				
 			default:
 				return false;
 		}
 	}
 
 	/**
-	 * Handle filter application
-	 */
-	private async handleApplyFilter(message: ComponentMessage): Promise<void> {
-		try {
-			const patch: any = {};
-			if (message.timeRange) { patch.timeRange = message.timeRange; }
-			if (message.workspace) { patch.workspace = message.workspace; }
-			if (message.agentIds) { patch.agents = message.agentIds; }
-			if (message.modelIds) { patch.models = message.modelIds; }
-			
-			if (Object.keys(patch).length > 0) {
-				await this.model.updateFilters(patch);
-			}
-		} catch (error) {
-			this.logger.error('Failed to apply filter patch', error);
-		}
-	}
-
-	/**
-	 * Handle refresh request
-	 */
-	private async handleRefresh(): Promise<void> {
-		try {
-			await this.model.refreshAllData();
-			this.logger.info('Data refreshed from filters component');
-		} catch (error) {
-			this.logger.error('Error refreshing data from filters:', error);
-		}
-	}
-
-	/**
 	 * Render the filters HTML
 	 */
-	protected render(): string {
+	public render(): string {
 		const filtersVmState = this.viewModel.getState();
 		const state: FiltersState = {
 			timeRange: filtersVmState.timeRange,
@@ -120,108 +108,41 @@ export class FiltersView extends ComponentBase {
 		const modelOptions = (state.modelOptions || []).map((id: string) => `<option value="${id}" ${id===state.modelId?'selected':''}>${id}</option>`).join('');
 
 		return `
-			<div class="filters" id="filters_bar">
-				<select id="flt_time" class="vscode-select">
-					${timeOptions.map(o => `<option value=\"${o.v}\" ${o.v===state.timeRange?'selected':''}>${o.l}</option>`).join('')}
-				</select>
-				<select id="flt_ws" class="vscode-select">
-					${wsOptions.map(o => `<option value=\"${o.v}\" ${o.v===state.workspace?'selected':''}>${o.l}</option>`).join('')}
-				</select>
-				<select id="flt_agent" class="vscode-select">
-					<option value="">Agent</option>
-					${agentOptions}
-				</select>
-				<select id="flt_model" class="vscode-select">
-					<option value="">Model</option>
-					${modelOptions}
-				</select>
-				<button id="flt_refresh" class="vscode-button">Refresh</button>
-			</div>
+			<section class="panel-section" aria-label="Filters">
+				<h2>Filters</h2>
+				<div class="filter-row">
+					<div class="filter-group">
+						<label for="flt_time">Time Range:</label>
+						<select id="flt_time" data-action="applyFilter" data-component="filters" data-filter="timeRange" class="vscode-select">
+							${timeOptions.map(o => `<option value="${o.v}" ${o.v===state.timeRange?'selected':''}>${o.l}</option>`).join('')}
+						</select>
+					</div>
+					<div class="filter-group">
+						<label for="flt_ws">Workspace:</label>
+						<select id="flt_ws" data-action="applyFilter" data-component="filters" data-filter="workspace" class="vscode-select">
+							${wsOptions.map(o => `<option value="${o.v}" ${o.v===state.workspace?'selected':''}>${o.l}</option>`).join('')}
+						</select>
+					</div>
+					<div class="filter-group">
+						<label for="flt_agent">Agent:</label>
+						<select id="flt_agent" data-action="applyFilter" data-component="filters" data-filter="agentId" class="vscode-select">
+							<option value="">All Agents</option>
+							${agentOptions}
+						</select>
+					</div>
+					<div class="filter-group">
+						<label for="flt_model">Model:</label>
+						<select id="flt_model" data-action="applyFilter" data-component="filters" data-filter="modelId" class="vscode-select">
+							<option value="">All Models</option>
+							${modelOptions}
+						</select>
+					</div>
+					<div class="filter-group">
+						<button id="flt_refresh" data-action="refresh" data-component="filters" class="vscode-button">Refresh</button>
+					</div>
+				</div>
+			</section>
 		`;
 	}
 
-	/**
-	 * Called when the model state changes - component updates itself
-	 */
-	private onStateChanged(): void {
-		const html = this.render();
-		this.updateView(html);
-	}
-
-	/**
-	 * Get client-side JavaScript for filter event handling
-	 */
-	getClientScript(): string {
-		return `
-			// Filter component event handlers
-			(function() {
-				let eventsBound = false;
-				
-				function bindFilterEvents() {
-					// Prevent double-binding events
-					if (eventsBound) {
-						return;
-					}
-					
-					const timeSelect = document.getElementById('flt_time');
-					const workspaceSelect = document.getElementById('flt_ws');
-					const agentSelect = document.getElementById('flt_agent');
-					const modelSelect = document.getElementById('flt_model');
-					const refreshButton = document.getElementById('flt_refresh');
-
-					// Only bind if at least one element exists
-					if (!timeSelect && !workspaceSelect && !agentSelect && !modelSelect && !refreshButton) {
-						return;
-					}
-
-					if (timeSelect) {
-						timeSelect.addEventListener('change', function() {
-							window.sendMessage('applyFilter', { timeRange: this.value });
-						});
-					}
-
-					if (workspaceSelect) {
-						workspaceSelect.addEventListener('change', function() {
-							window.sendMessage('applyFilter', { workspace: this.value });
-						});
-					}
-
-					if (agentSelect) {
-						agentSelect.addEventListener('change', function() {
-							const agentIds = this.value ? [this.value] : [];
-							window.sendMessage('applyFilter', { agentIds: agentIds });
-						});
-					}
-
-					if (modelSelect) {
-						modelSelect.addEventListener('change', function() {
-							const modelIds = this.value ? [this.value] : [];
-							window.sendMessage('applyFilter', { modelIds: modelIds });
-						});
-					}
-
-					if (refreshButton) {
-						refreshButton.addEventListener('click', function() {
-							window.sendMessage('refresh');
-						});
-					}
-					
-					eventsBound = true;
-				}
-
-				// Try to bind events when script loads
-				bindFilterEvents();
-
-				// Also try when the component is updated (only if not already bound)
-				window.addEventListener('message', function(event) {
-					const message = event.data;
-					if (message.type === 'component-update' && message.componentId === 'filters-container') {
-						// Reset flag and try to bind again after update
-						eventsBound = false;
-						setTimeout(bindFilterEvents, 10);
-					}
-				});
-			})();
-		`;
-	}
 }

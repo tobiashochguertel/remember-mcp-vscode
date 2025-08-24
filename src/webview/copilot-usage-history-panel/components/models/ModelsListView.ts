@@ -46,7 +46,7 @@ export class ModelsListView extends ComponentBase {
 	/**
 	 * Render the models list HTML
 	 */
-	protected render(): string {
+	public render(): string {
 		const state = this.viewModel.getState();
 
 		if (!state.items.length) {
