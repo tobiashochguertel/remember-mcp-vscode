@@ -106,11 +106,15 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 			this._model = new CopilotUsageHistoryModel(this.context, unifiedData, analytics, this.logger);
 			
 			// Create component models with specific dependencies
+			const filtersComponentModel = new FiltersComponentModel(this._model, this.logger);
+			const kpiChipsComponentModel = new KpiChipsComponentModel(analytics, this.logger);
+			const dailyRequestsChartComponentModel = new DailyRequestsChartComponentModel(analytics, this.logger);
+			
 			const componentModels: IComponentModel[] = [
 				// Converted to new framework
-				new FiltersComponentModel(this._model, this.logger),
-				new KpiChipsComponentModel(analytics, this.logger),
-				new DailyRequestsChartComponentModel(analytics, this.logger),
+				filtersComponentModel,
+				kpiChipsComponentModel,
+				dailyRequestsChartComponentModel,
 				
 				// Still using adapters (to be converted)
 				new ComponentModelAdapter('agents', new AgentsListViewModel(this._model, analytics, this.logger)),
@@ -123,9 +127,9 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 			
 			// Create all components that the view will manage
 			const components: IComponent[] = [
-				new FiltersView(webviewView.webview, this._model, this.logger),
-				new KpiChipsView(webviewView.webview, this._model, this.logger),
-				new DailyRequestsChartView(webviewView.webview, this._model, this.logger),
+				new FiltersView(webviewView.webview, filtersComponentModel, this.logger),
+				new KpiChipsView(webviewView.webview, kpiChipsComponentModel, this.logger),
+				new DailyRequestsChartView(webviewView.webview, dailyRequestsChartComponentModel, this.logger),
 				new AgentsListView(webviewView.webview, this._model, this.logger),
 				new ModelsListView(webviewView.webview, this._model, this.logger),
 				new ActivityFeedView(webviewView.webview, this._model, this.logger),

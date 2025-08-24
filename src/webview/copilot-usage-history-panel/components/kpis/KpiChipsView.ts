@@ -1,6 +1,5 @@
 import { ComponentBase, ComponentMessage } from '../shared/ComponentBase';
 import { KpiChipsComponentModel } from './KpiChipsComponentModel';
-import { CopilotUsageHistoryModel } from '../../copilot-usage-history-model';
 import { ILogger } from '../../../../types/logger';
 import * as vscode from 'vscode';
 
@@ -17,11 +16,11 @@ export class KpiChipsView extends ComponentBase {
 
 	constructor(
 		webview: vscode.Webview,
-		private model: CopilotUsageHistoryModel,
+		componentModel: KpiChipsComponentModel,
 		private logger: ILogger
 	) {
 		super('kpi-chips-container');
-		this.viewModel = this.model.kpiChipsViewModel;
+		this.viewModel = componentModel;
 
 		// Subscribe to model changes - component will be re-rendered when view calls render()
 		this.viewModel.onDidChange(() => {

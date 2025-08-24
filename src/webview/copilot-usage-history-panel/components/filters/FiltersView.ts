@@ -1,6 +1,5 @@
 import { ComponentBase, ComponentMessage } from '../shared/ComponentBase';
 import { FiltersComponentModel } from './FiltersComponentModel';
-import { CopilotUsageHistoryModel } from '../../copilot-usage-history-model';
 import { ILogger } from '../../../../types/logger';
 import * as vscode from 'vscode';
 
@@ -26,11 +25,11 @@ export class FiltersView extends ComponentBase {
 
 	constructor(
 		private webview: vscode.Webview,
-		private model: CopilotUsageHistoryModel,
+		componentModel: FiltersComponentModel,
 		private logger: ILogger
 	) {
 		super('filters-container');
-		this.viewModel = this.model.filtersViewModel;
+		this.viewModel = componentModel;
 
 		// Subscribe to model changes - but we don't need onStateChanged anymore
 		// since we render directly when requested

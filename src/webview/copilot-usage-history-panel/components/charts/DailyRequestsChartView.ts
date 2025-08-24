@@ -27,11 +27,11 @@ export class DailyRequestsChartView extends ComponentBase {
 
 	constructor(
 		private webview: vscode.Webview,
-		private model: any, // Model reference for accessing viewModel
+		componentModel: DailyRequestsChartComponentModel,
 		private logger: ILogger
 	) {
 		super('daily-requests-chart-container');
-		this.viewModel = this.model.dailyRequestsChartViewModel;
+		this.viewModel = componentModel;
 
 		// Subscribe to model changes - component will be re-rendered when view calls render()
 		this.viewModel.onDidChange(() => {
