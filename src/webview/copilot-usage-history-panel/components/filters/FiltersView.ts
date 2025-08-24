@@ -30,14 +30,6 @@ export class FiltersView extends ComponentBase {
 	) {
 		super('filters-container');
 		this.componentModel = componentModel;
-
-		// Subscribe to model changes - but we don't need onStateChanged anymore
-		// since we render directly when requested
-		this._disposables.push({
-			dispose: this.componentModel.subscribe(() => {
-				// Component will be re-rendered when the view calls render()
-			})
-		});
 	}
 
 	/**

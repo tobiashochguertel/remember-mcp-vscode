@@ -15,17 +15,12 @@ export class KpiChipsView extends ComponentBase {
 	private componentModel: KpiChipsComponentModel;
 
 	constructor(
-		webview: vscode.Webview,
+		private webview: vscode.Webview,
 		componentModel: KpiChipsComponentModel,
 		private logger: ILogger
 	) {
 		super('kpi-chips-container');
 		this.componentModel = componentModel;
-
-		// Subscribe to model changes - component will be re-rendered when view calls render()
-		this.componentModel.onDidChange(() => {
-			// Component will be re-rendered when the view calls render()
-		});
 	}
 
 	/**
