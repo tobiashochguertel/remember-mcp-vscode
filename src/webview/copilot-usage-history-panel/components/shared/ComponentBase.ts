@@ -52,7 +52,29 @@ export abstract class ComponentBase implements IComponent {
 		public readonly componentId: string
 	) {}
 
-	abstract handleMessage(message: ComponentMessage): Promise<boolean>;
+	async handleMessage(message: ComponentMessage): Promise<boolean> {
+		// Handle common messages that all components should respond to
+		if (message.type === 'component-refresh') {
+			this.refreshView();
+			return true;
+		}
+		
+		// Delegate to component-specific message handling
+		return await this.handleComponentMessage(message);
+	}
+
+	/**
+	 * Component-specific message handling - override this instead of handleMessage
+	 */
+	protected abstract handleComponentMessage(message: ComponentMessage): Promise<boolean>;
+
+	/**
+	 * Force the component to refresh its view
+	 */
+	protected refreshView(): void {
+		const html = this.render();
+		this.updateView(html);
+	}
 
 	/**
 	 * Update this component's HTML in the webview via PostMessage

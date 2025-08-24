@@ -30,14 +30,14 @@ export class ModelsListView extends ComponentBase {
 			this.onStateChanged();
 		});
 
-		// Send initial content immediately
-		this.onStateChanged();
+		// Don't send initial content immediately - wait for refreshComponentViews()
+		// this.onStateChanged();
 	}
 
 	/**
 	 * Handle messages relevant to models list
 	 */
-	async handleMessage(_message: ComponentMessage): Promise<boolean> {
+	protected async handleComponentMessage(_message: ComponentMessage): Promise<boolean> {
 		// Models list is read-only, so they don't handle any specific messages
 		// They update automatically when the model changes
 		return false;

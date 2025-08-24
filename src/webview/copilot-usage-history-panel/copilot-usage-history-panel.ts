@@ -57,6 +57,18 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 			});
 			this._disposables.push(messageHandler);
 
+			// Handle panel visibility changes to refresh components when re-shown
+			const visibilityHandler = webviewView.onDidChangeVisibility(() => {
+				if (webviewView.visible && this._view) {
+					// Panel is now visible - refresh all components to ensure they render
+					this.logger.trace('Panel became visible, refreshing component views');
+					this._view.refreshAllComponents().catch((error: any) => {
+						this.logger.error('Failed to refresh components on visibility change:', error);
+					});
+				}
+			});
+			this._disposables.push(visibilityHandler);
+
 			// Render view immediately (will show loading/empty state)
 			await this._view.render();
 

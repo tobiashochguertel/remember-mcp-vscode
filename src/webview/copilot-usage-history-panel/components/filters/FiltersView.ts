@@ -39,14 +39,14 @@ export class FiltersView extends ComponentBase {
 			})
 		});
 
-		// Send initial content immediately
-		this.onStateChanged();
+		// Don't send initial content immediately - wait for refreshComponentViews()
+		// this.onStateChanged();
 	}
 
 	/**
 	 * Handle messages related to filtering
 	 */
-	async handleMessage(message: ComponentMessage): Promise<boolean> {
+	protected async handleComponentMessage(message: ComponentMessage): Promise<boolean> {
 		switch (message.type) {
 			case 'applyFilter':
 				await this.handleApplyFilter(message);
@@ -72,7 +72,6 @@ export class FiltersView extends ComponentBase {
 			
 			if (Object.keys(patch).length > 0) {
 				await this.model.updateFilters(patch);
-				this.logger.debug?.('Applied filter patch', patch);
 			}
 		} catch (error) {
 			this.logger.error('Failed to apply filter patch', error);
@@ -147,5 +146,82 @@ export class FiltersView extends ComponentBase {
 	private onStateChanged(): void {
 		const html = this.render();
 		this.updateView(html);
+	}
+
+	/**
+	 * Get client-side JavaScript for filter event handling
+	 */
+	getClientScript(): string {
+		return `
+			// Filter component event handlers
+			(function() {
+				let eventsBound = false;
+				
+				function bindFilterEvents() {
+					// Prevent double-binding events
+					if (eventsBound) {
+						return;
+					}
+					
+					const timeSelect = document.getElementById('flt_time');
+					const workspaceSelect = document.getElementById('flt_ws');
+					const agentSelect = document.getElementById('flt_agent');
+					const modelSelect = document.getElementById('flt_model');
+					const refreshButton = document.getElementById('flt_refresh');
+
+					// Only bind if at least one element exists
+					if (!timeSelect && !workspaceSelect && !agentSelect && !modelSelect && !refreshButton) {
+						return;
+					}
+
+					if (timeSelect) {
+						timeSelect.addEventListener('change', function() {
+							window.sendMessage('applyFilter', { timeRange: this.value });
+						});
+					}
+
+					if (workspaceSelect) {
+						workspaceSelect.addEventListener('change', function() {
+							window.sendMessage('applyFilter', { workspace: this.value });
+						});
+					}
+
+					if (agentSelect) {
+						agentSelect.addEventListener('change', function() {
+							const agentIds = this.value ? [this.value] : [];
+							window.sendMessage('applyFilter', { agentIds: agentIds });
+						});
+					}
+
+					if (modelSelect) {
+						modelSelect.addEventListener('change', function() {
+							const modelIds = this.value ? [this.value] : [];
+							window.sendMessage('applyFilter', { modelIds: modelIds });
+						});
+					}
+
+					if (refreshButton) {
+						refreshButton.addEventListener('click', function() {
+							window.sendMessage('refresh');
+						});
+					}
+					
+					eventsBound = true;
+				}
+
+				// Try to bind events when script loads
+				bindFilterEvents();
+
+				// Also try when the component is updated (only if not already bound)
+				window.addEventListener('message', function(event) {
+					const message = event.data;
+					if (message.type === 'component-update' && message.componentId === 'filters-container') {
+						// Reset flag and try to bind again after update
+						eventsBound = false;
+						setTimeout(bindFilterEvents, 10);
+					}
+				});
+			})();
+		`;
 	}
 }

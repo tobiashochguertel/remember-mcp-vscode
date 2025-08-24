@@ -19,11 +19,11 @@ export class InsightsView extends ComponentBase {
 	) {
 		super(webview, 'insights-container');
 
-		// Initial paint
-		this.onStateChanged();
+		// Don't send initial content immediately - wait for refreshComponentViews()
+		// this.onStateChanged();
 	}
 
-	async handleMessage(_message: ComponentMessage): Promise<boolean> {
+	protected async handleComponentMessage(_message: ComponentMessage): Promise<boolean> {
 		// Read-only component; no direct message handling
 		return false;
 	}

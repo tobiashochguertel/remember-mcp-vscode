@@ -81,8 +81,40 @@ export class CopilotUsageHistoryView {
 		const html = await this.generateHtml();
 		this._webview.html = html;
 		
+		// CRITICAL: After setting HTML, trigger all components to update their containers
+		// This fixes the race condition where components tried to update before containers existed
+		await this.refreshComponentViews();
+		
 		const shouldShowToolbar = this._model.hasData();
 		await this.updateToolbarVisibility(shouldShowToolbar);
+	}
+
+	/**
+	 * Refresh all component views - forces them to re-render their current state
+	 * This is used after the HTML is set to populate the placeholder containers
+	 */
+	private async refreshComponentViews(): Promise<void> {
+		this._logger.trace('Refreshing all component views after HTML update');
+		
+		// Force each component to re-render by triggering their state change handlers
+		// This ensures the PostMessage updates are sent to existing DOM containers
+		for (const component of this.components) {
+			try {
+				// Trigger component update by calling their onStateChanged equivalent
+				// For now, we'll send a refresh message to each component
+				const refreshMessage = { type: 'component-refresh' };
+				await component.handleMessage(refreshMessage);
+			} catch (error) {
+				this._logger.error(`Error refreshing component ${component.componentId}:`, error);
+			}
+		}
+	}
+
+	/**
+	 * Public method to refresh all components - used when panel becomes visible again
+	 */
+	public async refreshAllComponents(): Promise<void> {
+		await this.refreshComponentViews();
 	}
 
 	/**
