@@ -1,7 +1,3 @@
-/**
- * Copilot Usage History Panel using MVVM architecture with micro-view-models
- */
-
 import * as vscode from 'vscode';
 import { ServiceContainer } from '../../types/service-container';
 import { ILogger } from '../../types/logger';
@@ -15,7 +11,56 @@ import { ActivityFeedView } from './components/activity/ActivityFeedView';
 import { DailyRequestsChartView } from './components/charts/DailyRequestsChartView';
 import { InsightsView } from './components/insights/InsightsView';
 import { IComponent } from './components/shared/ComponentBase';
+import { IComponentModel } from './components/shared/IComponentModel';
 
+// Temporary imports for existing view models (will be removed as we convert them)
+import { FiltersViewModel } from './components/filters/FiltersViewModel';
+import { KpiChipsViewModel } from './components/kpis/KpiChipsViewModel';
+import { AgentsListViewModel } from './components/agents/AgentsListViewModel';
+import { ModelsListViewModel } from './components/models/ModelsListViewModel';
+import { ActivityFeedViewModel } from './components/activity/ActivityFeedViewModel';
+import { DailyRequestsChartViewModel } from './components/charts/DailyRequestsChartViewModel';
+
+/**
+ * Temporary adapter to bridge existing view models to IComponentModel interface
+ * This will be removed as we convert each model to implement IComponentModel directly
+ */
+class ComponentModelAdapter implements IComponentModel {
+	constructor(
+		public readonly id: string,
+		public readonly legacyModel: any
+	) {}
+
+	async refresh(_filters: import('./copilot-usage-history-model').GlobalFilters): Promise<void> {
+		// For now, legacy models don't have refresh method, so we do nothing
+		// They will be updated via the old mechanism until converted
+	}
+
+	onDidChange(listener: () => void): () => void {
+		if (this.legacyModel.onDidChange) {
+			return this.legacyModel.onDidChange(listener);
+		}
+		// Return no-op unsubscribe function if not supported
+		return () => {};
+	}
+
+	dispose(): void {
+		if (this.legacyModel.dispose) {
+			this.legacyModel.dispose();
+		}
+	}
+
+	isLoading(): boolean {
+		if (this.legacyModel.isLoading) {
+			return this.legacyModel.isLoading();
+		}
+		return false;
+	}
+}
+
+/**
+ * Copilot Usage History Panel using MVVM architecture with micro-view-models
+ */
 export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vscode.Disposable {
 	public static readonly viewType = 'copilot-usage-history-panel';
 
@@ -55,8 +100,22 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 			const unifiedData = container.getUnifiedSessionDataService();
 			const analytics = container.getAnalyticsService();
 
-			// Initialize model and view immediately (before data service is fully ready)
+			// Initialize model first
 			this._model = new CopilotUsageHistoryModel(this.context, unifiedData, analytics, this.logger);
+			
+			// Create component models with specific dependencies (temporary - will be replaced when models are converted)
+			const componentModels: IComponentModel[] = [
+				// Note: These are temporary adapters until we convert the existing models to IComponentModel
+				new ComponentModelAdapter('filters', new FiltersViewModel(this._model, this.logger)),
+				new ComponentModelAdapter('kpis', new KpiChipsViewModel(this._model, analytics, this.logger)),
+				new ComponentModelAdapter('agents', new AgentsListViewModel(this._model, analytics, this.logger)),
+				new ComponentModelAdapter('models', new ModelsListViewModel(this._model, analytics, this.logger)),
+				new ComponentModelAdapter('activity', new ActivityFeedViewModel(this._model, analytics, this.logger)),
+				new ComponentModelAdapter('charts', new DailyRequestsChartViewModel(this._model, analytics, this.logger))
+			];
+
+			// Inject component models into main model
+			this._model.setComponentModels(componentModels);
 			
 			// Create all components that the view will manage
 			const components: IComponent[] = [
