@@ -22,12 +22,6 @@ export class FiltersComponentModel implements IComponentModel {
 		// Initialize state from current model filters
 		const gf = model.getFilters();
 		this.state = this.fromGlobalFilters(gf);
-		
-		// Subscribe to model filter changes to update our state
-		this.model.onFiltersChanged(f => {
-			this.state = this.fromGlobalFilters(f);
-			this.notifyListeners();
-		});
 	}
 
 	/**
@@ -79,7 +73,16 @@ export class FiltersComponentModel implements IComponentModel {
 		try {
 			switch (event.type) {
 				case 'applyFilter': {
-					await this.model.updateFilters(event.patch as any);
+					// Use new simple API: get filters, modify them, update
+					const filters = this.model.getFilters();
+					if (event.patch.timeRange) {
+						filters.timeRange = event.patch.timeRange;
+					}
+					if (event.patch.workspace) {
+						filters.workspace = event.patch.workspace;
+					}
+					// Note: agentIds/modelIds from UI need to be mapped to agents/models arrays
+					await this.model.updateFilters(filters);
 					break;
 				}
 				case 'refresh': {

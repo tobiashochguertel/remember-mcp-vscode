@@ -9,66 +9,15 @@ import { ILogger } from '../../types/logger';
  * Composes micro-view-models and manages data/business logic
  */
 export class CopilotUsageHistoryModel {
+	// Private state
 	private _listeners: Array<() => void> = [];
 	private _errorMessage: string | undefined;
+	private _componentModels: IComponentModel[] = [];
 
 	// Global filter state (authoritative in-memory runtime filters)
 	private _filters = new GlobalFilters();
-	private _filterListeners: Array<(f: GlobalFilters) => void> = [];
 
-	/**
-	 * Get current global filters (immutable copy)
-	 */
-	public getFilters(): GlobalFilters {
-		const copy = new GlobalFilters();
-		copy.timeRange = this._filters.timeRange;
-		copy.workspace = this._filters.workspace;
-		copy.agents = [...this._filters.agents];
-		copy.models = [...this._filters.models];
-		return copy;
-	}
-
-	/**
-	 * Subscribe to global filter changes
-	 */
-	public onFiltersChanged(listener: (f: GlobalFilters) => void): void {
-		this._filterListeners.push(listener);
-	}
-
-	private _emitFilters(): void {
-		for (const l of this._filterListeners) {
-			try { l(this.getFilters()); } catch (e) { this.logger.error('Filter listener error', e); }
-		}
-	}
-
-	/**
-	 * Update filters (authoritative runtime state). Handles mapping of 'all' timeRange internally
-	 */
-	public async updateFilters(patch: Partial<GlobalFilters>): Promise<void> {
-		const prev = JSON.stringify(this._filters);
-		Object.assign(this._filters, patch);
-		const changed = prev !== JSON.stringify(this._filters);
-		if (!changed) { return; }
-		
-		this.logger.debug?.('[Filters] updateFilters', { filters: this._filters });
-		this._emitFilters();
-		
-		// For now only timeRange drives data reloads
-		if (patch.timeRange) {
-			// Map 'all' to '90d' temporarily for analytics/settings until backend full support
-			const effective: Exclude<AnalyticsTimeRange,'all'> = (this._filters.timeRange === 'all' ? '90d' : this._filters.timeRange) as Exclude<AnalyticsTimeRange,'all'>;
-			// Persist only supported enumerated range (no 'all')
-			await this.updateSettings({ defaultTimeRange: effective });
-			await this.refreshAllData();
-		} else {
-			// Future: targeted refreshes for agents/models; for now do full refresh to stay correct
-			await this.refreshAllData();
-		}
-	}
-
-	// Component models (injected by panel)
-	private _componentModels: IComponentModel[] = [];
-
+	// Constructor
 	constructor(
 		private readonly extensionContext: vscode.ExtensionContext,
 		private readonly unifiedService: UnifiedSessionDataService,
@@ -85,6 +34,7 @@ export class CopilotUsageHistoryModel {
 		});
 	}
 
+	// Component Model Management
 	/**
 	 * Set component models (called by panel after construction)
 	 */
@@ -100,37 +50,31 @@ export class CopilotUsageHistoryModel {
 		return this._componentModels.find(m => m.id === id) as T;
 	}
 
-	// Backward compatibility properties for views
-	public get filtersViewModel(): any {
-		// Direct access for converted models
-		return this.getComponentModel('filters');
+	// Global Filter Management
+	/**
+	 * Get global filters (direct access to the instance)
+	 */
+	public getFilters(): GlobalFilters {
+		return this._filters;
 	}
 
-	public get kpiChipsViewModel(): any {
-		// Direct access for converted models
-		return this.getComponentModel('kpis');
+	/**
+	 * Update filters and refresh data accordingly
+	 */
+	public async updateFilters(filters: GlobalFilters): Promise<void> {
+		this.logger.debug?.('[Filters] updateFilters', { filters });
+		
+		// Update the internal state
+		this._filters = filters;
+		
+		// Persist timeRange setting if it changed
+		await this.updateSettings({ defaultTimeRange: filters.timeRange === 'all' ? '90d' : filters.timeRange });
+		
+		// Refresh all data
+		await this.refreshAllData();
 	}
 
-	public get agentsListViewModel(): any {
-		const adapter = this.getComponentModel('agents') as any;
-		return adapter?.legacyModel;
-	}
-
-	public get modelsListViewModel(): any {
-		const adapter = this.getComponentModel('models') as any;
-		return adapter?.legacyModel;
-	}
-
-	public get activityFeedViewModel(): any {
-		const adapter = this.getComponentModel('activity') as any;
-		return adapter?.legacyModel;
-	}
-
-	public get dailyRequestsChartViewModel(): any {
-		// Return the new component model directly (it has backward compatible methods)
-		return this.getComponentModel('charts');
-	}
-
+	// Data Initialization and Refresh
 	/**
 	 * Initialize data asynchronously in the background
 	 */
@@ -191,24 +135,7 @@ export class CopilotUsageHistoryModel {
 		);
 	}
 
-	/**
-	 * Set global error state
-	 */
-	private setGlobalError(error: string): void {
-		this._errorMessage = error;
-		this.logger.error('History model error state:', error);
-		this.notifyListeners();
-	}
-
-	public getErrorMessage(): string | undefined {
-		return this._errorMessage;
-	}
-
-
-	/**
-	 * Public API methods
-	 */
-
+	// Public API Methods
 	/**
 	 * Subscribe to data changes
 	 */
@@ -231,16 +158,16 @@ export class CopilotUsageHistoryModel {
 	 * Update time range setting
 	 */
 	public async updateTimeRange(timeRange: 'today' | '7d' | '30d' | '90d'): Promise<void> {
-		await this.updateSettings({ defaultTimeRange: timeRange });
-		await this.refreshAllData();
+		const filters = this.getFilters();
+		filters.timeRange = timeRange;
+		await this.updateFilters(filters);
 	}
-
 
 	/**
 	 * Export usage data
 	 */
 	public async getExportData(): Promise<any> {
-	// Export functionality will be implemented later
+		// Export functionality will be implemented later
 		return {
 			metadata: {
 				exportedAt: new Date().toISOString(),
@@ -250,6 +177,25 @@ export class CopilotUsageHistoryModel {
 		};
 	}
 
+	public isScanning(): boolean {
+		return this.analyticsService.isScanning();
+	}
+
+	// Error Handling
+	/**
+	 * Set global error state
+	 */
+	private setGlobalError(error: string): void {
+		this._errorMessage = error;
+		this.logger.error('History model error state:', error);
+		this.notifyListeners();
+	}
+
+	public getErrorMessage(): string | undefined {
+		return this._errorMessage;
+	}
+
+	// Event Handling
 	/**
 	 * Notify all listeners of data changes
 	 */
@@ -263,6 +209,20 @@ export class CopilotUsageHistoryModel {
 		});
 	}
 
+	// Settings Persistence
+	private async getSettings(): Promise<{ defaultTimeRange: 'today' | '7d' | '30d' | '90d' }> { // TODO(persistence-v1): Extend to full GlobalFilters snapshot with versioning
+		const key = 'copilot-usage-history-settings';
+		const stored = this.extensionContext.globalState.get<{ defaultTimeRange: 'today' | '7d' | '30d' | '90d' }>(key);
+		return stored || { defaultTimeRange: '30d' };
+	}
+
+	private async updateSettings(update: Partial<{ defaultTimeRange: 'today' | '7d' | '30d' | '90d' }>): Promise<void> { // TODO(persistence-v1): Replace with unified saveFilters() (debounced) once full filter persistence added
+		const key = 'copilot-usage-history-settings';
+		const current = await this.getSettings();
+		await this.extensionContext.globalState.update(key, { ...current, ...update });
+	}
+
+	// Cleanup
 	/**
 	 * Dispose and clean up resources
 	 */
@@ -279,27 +239,8 @@ export class CopilotUsageHistoryModel {
 
 		// Clear listeners
 		this._listeners = [];
-		this._filterListeners = [];
 		// No explicit unsubscribe available for analytics; instance lifespan is tied to panel lifespan
 	}
-
-	public isScanning(): boolean {
-		return this.analyticsService.isScanning();
-	}
-
-	// ---------- New helpers using AnalyticsService / Unified data ----------
-	private async getSettings(): Promise<{ defaultTimeRange: 'today' | '7d' | '30d' | '90d' }> { // TODO(persistence-v1): Extend to full GlobalFilters snapshot with versioning
-		const key = 'copilot-usage-history-settings';
-		const stored = this.extensionContext.globalState.get<{ defaultTimeRange: 'today' | '7d' | '30d' | '90d' }>(key);
-		return stored || { defaultTimeRange: '30d' };
-	}
-
-	private async updateSettings(update: Partial<{ defaultTimeRange: 'today' | '7d' | '30d' | '90d' }>): Promise<void> { // TODO(persistence-v1): Replace with unified saveFilters() (debounced) once full filter persistence added
-		const key = 'copilot-usage-history-settings';
-		const current = await this.getSettings();
-		await this.extensionContext.globalState.update(key, { ...current, ...update });
-	}
-
 }
 
 // Global filters class (runtime authoritative state)

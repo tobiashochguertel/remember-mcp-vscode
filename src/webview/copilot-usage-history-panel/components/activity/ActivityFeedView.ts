@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ComponentBase, ComponentMessage } from '../shared/ComponentBase';
-import { ActivityFeedViewModel } from './ActivityFeedViewModel';
+import { ActivityFeedComponentModel } from './ActivityFeedComponentModel';
 import { ILogger } from '../../../../types/logger';
 
 export interface ActivityItemState {
@@ -19,15 +19,15 @@ export interface ActivityFeedState {
 }
 
 export class ActivityFeedView extends ComponentBase {
-	private viewModel: ActivityFeedViewModel;
+	private viewModel: ActivityFeedComponentModel;
 
 	constructor(
 		private webview: vscode.Webview,
-		private model: any, // Model reference for accessing viewModel
+		componentModel: ActivityFeedComponentModel,
 		private logger: ILogger
 	) {
 		super('activity-feed-container');
-		this.viewModel = this.model.activityFeedViewModel;
+		this.viewModel = componentModel;
 
 		// Subscribe to model changes - component will be re-rendered when view calls render()
 		this.viewModel.onDidChange(() => {

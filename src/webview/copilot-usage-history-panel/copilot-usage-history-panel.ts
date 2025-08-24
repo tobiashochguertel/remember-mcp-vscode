@@ -13,52 +13,13 @@ import { InsightsView } from './components/insights/InsightsView';
 import { IComponent } from './components/shared/ComponentBase';
 import { IComponentModel } from './components/shared/IComponentModel';
 
-// Temporary imports for remaining view models (will be removed as we convert them)
-import { AgentsListViewModel } from './components/agents/AgentsListViewModel';
-import { ModelsListViewModel } from './components/models/ModelsListViewModel';
-import { ActivityFeedViewModel } from './components/activity/ActivityFeedViewModel';
-
 // New component models
 import { FiltersComponentModel } from './components/filters/FiltersComponentModel';
 import { KpiChipsComponentModel } from './components/kpis/KpiChipsComponentModel';
 import { DailyRequestsChartComponentModel } from './components/charts/DailyRequestsChartComponentModel';
-
-/**
- * Temporary adapter to bridge existing view models to IComponentModel interface
- * This will be removed as we convert each model to implement IComponentModel directly
- */
-class ComponentModelAdapter implements IComponentModel {
-	constructor(
-		public readonly id: string,
-		public readonly legacyModel: any
-	) {}
-
-	async refresh(_filters: import('./copilot-usage-history-model').GlobalFilters): Promise<void> {
-		// For now, legacy models don't have refresh method, so we do nothing
-		// They will be updated via the old mechanism until converted
-	}
-
-	onDidChange(listener: () => void): () => void {
-		if (this.legacyModel.onDidChange) {
-			return this.legacyModel.onDidChange(listener);
-		}
-		// Return no-op unsubscribe function if not supported
-		return () => {};
-	}
-
-	dispose(): void {
-		if (this.legacyModel.dispose) {
-			this.legacyModel.dispose();
-		}
-	}
-
-	isLoading(): boolean {
-		if (this.legacyModel.isLoading) {
-			return this.legacyModel.isLoading();
-		}
-		return false;
-	}
-}
+import { AgentsListComponentModel } from './components/agents/AgentsListComponentModel';
+import { ModelsListComponentModel } from './components/models/ModelsListComponentModel';
+import { ActivityFeedComponentModel } from './components/activity/ActivityFeedComponentModel';
 
 /**
  * Copilot Usage History Panel using MVVM architecture with micro-view-models
@@ -109,17 +70,18 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 			const filtersComponentModel = new FiltersComponentModel(this._model, this.logger);
 			const kpiChipsComponentModel = new KpiChipsComponentModel(analytics, this.logger);
 			const dailyRequestsChartComponentModel = new DailyRequestsChartComponentModel(analytics, this.logger);
+			const agentsListComponentModel = new AgentsListComponentModel(analytics, this.logger);
+			const modelsListComponentModel = new ModelsListComponentModel(analytics, this.logger);
+			const activityFeedComponentModel = new ActivityFeedComponentModel(analytics, this.logger);
 			
 			const componentModels: IComponentModel[] = [
-				// Converted to new framework
+				// All converted to new framework
 				filtersComponentModel,
 				kpiChipsComponentModel,
 				dailyRequestsChartComponentModel,
-				
-				// Still using adapters (to be converted)
-				new ComponentModelAdapter('agents', new AgentsListViewModel(this._model, analytics, this.logger)),
-				new ComponentModelAdapter('models', new ModelsListViewModel(this._model, analytics, this.logger)),
-				new ComponentModelAdapter('activity', new ActivityFeedViewModel(this._model, analytics, this.logger))
+				agentsListComponentModel,
+				modelsListComponentModel,
+				activityFeedComponentModel
 			];
 
 			// Inject component models into main model
@@ -130,9 +92,9 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 				new FiltersView(webviewView.webview, filtersComponentModel, this.logger),
 				new KpiChipsView(webviewView.webview, kpiChipsComponentModel, this.logger),
 				new DailyRequestsChartView(webviewView.webview, dailyRequestsChartComponentModel, this.logger),
-				new AgentsListView(webviewView.webview, this._model, this.logger),
-				new ModelsListView(webviewView.webview, this._model, this.logger),
-				new ActivityFeedView(webviewView.webview, this._model, this.logger),
+				new AgentsListView(webviewView.webview, agentsListComponentModel, this.logger),
+				new ModelsListView(webviewView.webview, modelsListComponentModel, this.logger),
+				new ActivityFeedView(webviewView.webview, activityFeedComponentModel, this.logger),
 				new InsightsView(webviewView.webview, this._model, this.logger)
 			];
 			

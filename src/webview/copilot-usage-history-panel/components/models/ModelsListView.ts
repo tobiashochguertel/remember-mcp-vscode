@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ComponentBase, ComponentMessage } from '../shared/ComponentBase';
-import { ModelsListViewModel } from './ModelsListViewModel';
+import { ModelsListComponentModel } from './ModelsListComponentModel';
 import { ILogger } from '../../../../types/logger';
 
 export interface ModelItem {
@@ -15,15 +15,15 @@ export interface ModelsListState {
 }
 
 export class ModelsListView extends ComponentBase {
-	private viewModel: ModelsListViewModel;
+	private viewModel: ModelsListComponentModel;
 
 	constructor(
 		webview: vscode.Webview,
-		private model: any, // Model reference for accessing viewModel
+		componentModel: ModelsListComponentModel,
 		private logger: ILogger
 	) {
 		super('models-list-container');
-		this.viewModel = this.model.modelsListViewModel;
+		this.viewModel = componentModel;
 
 		// Subscribe to model changes - component will be re-rendered when view calls render()
 		this.viewModel.onDidChange(() => {
