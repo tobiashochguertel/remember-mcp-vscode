@@ -23,7 +23,7 @@ export interface DailyRequestsChartRenderState {
  * Renders Chart.js bar chart showing requests per day
  */
 export class DailyRequestsChartView extends ComponentBase {
-	private viewModel: DailyRequestsChartComponentModel;
+	private componentModel: DailyRequestsChartComponentModel;
 
 	constructor(
 		private webview: vscode.Webview,
@@ -31,10 +31,10 @@ export class DailyRequestsChartView extends ComponentBase {
 		private logger: ILogger
 	) {
 		super('daily-requests-chart-container');
-		this.viewModel = componentModel;
+		this.componentModel = componentModel;
 
 		// Subscribe to model changes - component will be re-rendered when view calls render()
-		this.viewModel.onDidChange(() => {
+		this.componentModel.onDidChange(() => {
 			// Component will be re-rendered when the view calls render()
 		});
 	}
@@ -52,9 +52,9 @@ export class DailyRequestsChartView extends ComponentBase {
 	 * Render the daily requests chart HTML
 	 */
 	public render(): string {
-		const vmState = this.viewModel.getState();
+		const cmState = this.componentModel.getState();
 
-		if (vmState.isLoading) {
+		if (cmState.isLoading) {
 			return `
 				<section class="daily-requests-chart">
 					<h4>Daily Requests</h4>
@@ -65,7 +65,7 @@ export class DailyRequestsChartView extends ComponentBase {
 			`;
 		}
 
-		if (vmState.isEmpty) {
+		if (cmState.isEmpty) {
 			return `
 				<section class="daily-requests-chart">
 					<h4>Daily Requests</h4>
@@ -77,7 +77,7 @@ export class DailyRequestsChartView extends ComponentBase {
 		}
 
 		// Get chart data from the component model
-		const chartData = this.viewModel.getChartData();
+		const chartData = this.componentModel.getChartData();
 
 		const canvasId = 'dailyRequestsChart';
 		// Build chart config in TypeScript (use CSS var tokens; they'll be resolved in the webview)

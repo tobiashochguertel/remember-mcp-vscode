@@ -21,7 +21,7 @@ export interface FiltersActions {
  * Filters Component - manages filter state and user interactions via PostMessage
  */
 export class FiltersView extends ComponentBase {
-	private viewModel: FiltersComponentModel;
+	private componentModel: FiltersComponentModel;
 
 	constructor(
 		private webview: vscode.Webview,
@@ -29,12 +29,12 @@ export class FiltersView extends ComponentBase {
 		private logger: ILogger
 	) {
 		super('filters-container');
-		this.viewModel = componentModel;
+		this.componentModel = componentModel;
 
 		// Subscribe to model changes - but we don't need onStateChanged anymore
 		// since we render directly when requested
 		this._disposables.push({
-			dispose: this.viewModel.subscribe(() => {
+			dispose: this.componentModel.subscribe(() => {
 				// Component will be re-rendered when the view calls render()
 			})
 		});
@@ -63,13 +63,13 @@ export class FiltersView extends ComponentBase {
 					if (filterProperty) {
 						const patch: Partial<FiltersState> = {};
 						patch[filterProperty] = message.data.value || undefined;
-						this.viewModel.handle({ type: 'applyFilter', patch });
+						this.componentModel.handle({ type: 'applyFilter', patch });
 					}
 				}
 				return true;
 				
 			case 'refresh':
-				this.viewModel.handle({ type: 'refresh' });
+				this.componentModel.handle({ type: 'refresh' });
 				return true;
 				
 			default:
@@ -81,12 +81,12 @@ export class FiltersView extends ComponentBase {
 	 * Render the filters HTML
 	 */
 	public render(): string {
-		const filtersVmState = this.viewModel.getState();
+		const cmState = this.componentModel.getState();
 		const state: FiltersState = {
-			timeRange: filtersVmState.timeRange,
+			timeRange: cmState.timeRange,
 			workspace: 'all',
-			agentOptions: filtersVmState.agentOptions,
-			modelOptions: filtersVmState.modelOptions,
+			agentOptions: cmState.agentOptions,
+			modelOptions: cmState.modelOptions,
 			agentId: undefined,
 			modelId: undefined
 		};

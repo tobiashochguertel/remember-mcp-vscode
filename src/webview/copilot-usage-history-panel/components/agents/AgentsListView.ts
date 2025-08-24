@@ -17,7 +17,7 @@ export interface AgentsListState {
 }
 
 export class AgentsListView extends ComponentBase {
-	private viewModel: AgentsListComponentModel;
+	private componentModel: AgentsListComponentModel;
 
 	constructor(
 		webview: vscode.Webview,
@@ -25,10 +25,10 @@ export class AgentsListView extends ComponentBase {
 		private logger: ILogger
 	) {
 		super('agents-list-container');
-		this.viewModel = componentModel;
+		this.componentModel = componentModel;
 
 		// Subscribe to model changes - component will be re-rendered when view calls render()
-		this.viewModel.onDidChange(() => {
+		this.componentModel.onDidChange(() => {
 			// Component will be re-rendered when the view calls render()
 		});
 	}
@@ -46,7 +46,7 @@ export class AgentsListView extends ComponentBase {
 	 * Render the agents list HTML
 	 */
 	public render(): string {
-		const state = this.viewModel.getState();
+		const state = this.componentModel.getState();
 
 		if (state.isLoading) {
 			return '<section class="agents panel-section"><h4>Agents</h4><div class="empty">Loading...</div></section>';
@@ -67,7 +67,7 @@ export class AgentsListView extends ComponentBase {
 						</tr>
 					</thead>
 					<tbody>
-						${state.items.map(i => `
+						${state.items.map((i: AgentItem) => `
 							<tr>
 								<td class="id">${i.id}</td>
 								<td class="num">${i.count}</td>

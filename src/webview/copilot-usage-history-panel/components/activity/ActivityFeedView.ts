@@ -18,8 +18,11 @@ export interface ActivityFeedState {
 	items: ActivityItemState[];
 }
 
+/**
+ * Activity Feed Component View
+ */
 export class ActivityFeedView extends ComponentBase {
-	private viewModel: ActivityFeedComponentModel;
+	private componentModel: ActivityFeedComponentModel;
 
 	constructor(
 		private webview: vscode.Webview,
@@ -27,10 +30,10 @@ export class ActivityFeedView extends ComponentBase {
 		private logger: ILogger
 	) {
 		super('activity-feed-container');
-		this.viewModel = componentModel;
+		this.componentModel = componentModel;
 
 		// Subscribe to model changes - component will be re-rendered when view calls render()
-		this.viewModel.onDidChange(() => {
+		this.componentModel.onDidChange(() => {
 			// Component will be re-rendered when the view calls render()
 		});
 	}
@@ -48,7 +51,7 @@ export class ActivityFeedView extends ComponentBase {
 	 * Render the activity feed HTML
 	 */
 	public render(): string {
-		const state = this.viewModel.getState();
+		const state = this.componentModel.getState();
 
 		if (!state.items.length) {
 			return '<section class="activity panel-section"><h4>Activity</h4><div class="empty">No recent activity</div></section>';
@@ -80,7 +83,7 @@ export class ActivityFeedView extends ComponentBase {
 						</tr>
 					</thead>
 					<tbody>
-						${state.items.map(i => `
+						${state.items.map((i: ActivityItemState) => `
 							<tr title="${i.type} • ${i.agent} • ${i.model}">
 								<td class="datetime" data-iso="${i.timeISO}">${fmt(i.timeISO)}</td>
 								<td>${i.type}</td>

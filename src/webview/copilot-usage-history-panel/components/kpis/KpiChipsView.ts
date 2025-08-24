@@ -12,7 +12,7 @@ export interface KpiChipsRenderState {
  * KPI Chips Component - manages its own state and rendering via PostMessage
  */
 export class KpiChipsView extends ComponentBase {
-	private viewModel: KpiChipsComponentModel;
+	private componentModel: KpiChipsComponentModel;
 
 	constructor(
 		webview: vscode.Webview,
@@ -20,10 +20,10 @@ export class KpiChipsView extends ComponentBase {
 		private logger: ILogger
 	) {
 		super('kpi-chips-container');
-		this.viewModel = componentModel;
+		this.componentModel = componentModel;
 
 		// Subscribe to model changes - component will be re-rendered when view calls render()
-		this.viewModel.onDidChange(() => {
+		this.componentModel.onDidChange(() => {
 			// Component will be re-rendered when the view calls render()
 		});
 	}
@@ -41,10 +41,10 @@ export class KpiChipsView extends ComponentBase {
 	 * Render the KPI chips HTML
 	 */
 	public render(): string {
-		const vmState = this.viewModel.getState();
+		const cmState = this.componentModel.getState();
 		const state: KpiChipsRenderState = {
-			chips: vmState.chips.map(c => ({ label: c.label, value: c.value, tooltip: c.tooltip })),
-			isLoading: vmState.isLoading
+			chips: cmState.chips.map((c: any) => ({ label: c.label, value: c.value, tooltip: c.tooltip })),
+			isLoading: cmState.isLoading
 		};
 
 		if (state.isLoading) {

@@ -15,7 +15,7 @@ export interface ModelsListState {
 }
 
 export class ModelsListView extends ComponentBase {
-	private viewModel: ModelsListComponentModel;
+	private componentModel: ModelsListComponentModel;
 
 	constructor(
 		webview: vscode.Webview,
@@ -23,10 +23,10 @@ export class ModelsListView extends ComponentBase {
 		private logger: ILogger
 	) {
 		super('models-list-container');
-		this.viewModel = componentModel;
+		this.componentModel = componentModel;
 
 		// Subscribe to model changes - component will be re-rendered when view calls render()
-		this.viewModel.onDidChange(() => {
+		this.componentModel.onDidChange(() => {
 			// Component will be re-rendered when the view calls render()
 		});
 	}
@@ -44,7 +44,7 @@ export class ModelsListView extends ComponentBase {
 	 * Render the models list HTML
 	 */
 	public render(): string {
-		const state = this.viewModel.getState();
+		const state = this.componentModel.getState();
 
 		if (!state.items.length) {
 			return '<section class="models panel-section"><h4>Models</h4><div class="empty">No data</div></section>';
@@ -62,7 +62,7 @@ export class ModelsListView extends ComponentBase {
 						</tr>
 					</thead>
 					<tbody>
-						${state.items.map(i => `
+						${state.items.map((i: ModelItem) => `
 							<tr>
 								<td class="id">${i.id}</td>
 								<td class="num">${i.count}</td>
