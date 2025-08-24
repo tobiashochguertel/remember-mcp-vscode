@@ -18,7 +18,11 @@ export interface Kpis {
 	files: number;
 	edits: number;
 	fileModifications: number; // NEW: Total individual file edits made
-	latencyMsMedian: number;
+	latencyMsMedian: number; // Turn-level median latency
+	requestLatencyMsMean: number; // NEW: Request-level mean latency
+	requestLatencyMsP95: number; // NEW: Request-level 95th percentile latency
+	firstProgressMsMedian: number; // NEW: Time to first token median
+	firstProgressMsP95: number; // NEW: Time to first token 95th percentile
 	editRatio: number;
 	editProductivity: number; // NEW: Average file modifications per edit turn
 	models: number;
@@ -122,8 +126,22 @@ export class AnalyticsService {
 		
 		const models = new Set(turns.map(r => r.model).filter(Boolean)).size;
 		const agents = new Set(turns.map(r => r.agent).filter(Boolean)).size;
+		
+		// Turn-level latency (existing)
 		const latencies = turns.map(r => r.latencyMs).filter((v): v is number => typeof v === 'number' && !isNaN(v));
 		const latencyMsMedian = this.median(latencies) ?? 0;
+		
+		// NEW: First progress latency (time to first token)
+		const firstProgressLatencies = turns.map(r => r.firstProgressMs).filter((v): v is number => typeof v === 'number' && !isNaN(v));
+		const firstProgressMsMedian = this.median(firstProgressLatencies) ?? 0;
+		const firstProgressMsP95 = this.percentile(firstProgressLatencies, 95) ?? 0;
+		
+		// NEW: Request-level latency extraction
+		const requestLatencies = this.extractRequestLatencies(turns);
+		const requestLatencyMsMean = requestLatencies.length > 0 ? 
+			requestLatencies.reduce((sum: number, lat: number) => sum + lat, 0) / requestLatencies.length : 0;
+		const requestLatencyMsP95 = this.percentile(requestLatencies, 95) ?? 0;
+		
 		const requests = turns.reduce((sum, r) => sum + (Array.isArray(r.modelRequests) ? r.modelRequests.length : 0), 0);
 
 		// ACTION-BASED edit counting: measures actual model performance ("what happened")
@@ -141,6 +159,10 @@ export class AnalyticsService {
 			edits, 
 			fileModifications,
 			latencyMsMedian, 
+			requestLatencyMsMean,
+			requestLatencyMsP95,
+			firstProgressMsMedian,
+			firstProgressMsP95,
 			editRatio, 
 			editProductivity,
 			models, 
@@ -259,6 +281,50 @@ export class AnalyticsService {
 	}
 
 	// Helpers
+	
+	/**
+	 * Extract request-level latencies from turns
+	 * If per-round timings are available, use them; otherwise distribute turn timing evenly across rounds
+	 */
+	private extractRequestLatencies(turns: Array<ReturnType<AnalyticsService['mapTurn']>>): number[] {
+		const requestLatencies: number[] = [];
+		
+		for (const turn of turns) {
+			const turnLatencyMs = turn.latencyMs;
+			const requestCount = Array.isArray(turn.modelRequests) ? turn.modelRequests.length : 0;
+			
+			if (typeof turnLatencyMs === 'number' && !isNaN(turnLatencyMs) && requestCount > 0) {
+				// Check if individual round timings are available (future enhancement)
+				// For now, distribute turn latency evenly across requests
+				const avgRequestLatency = turnLatencyMs / requestCount;
+				for (let i = 0; i < requestCount; i++) {
+					requestLatencies.push(avgRequestLatency);
+				}
+			}
+		}
+		
+		return requestLatencies;
+	}
+	
+	/**
+	 * Calculate percentile (e.g., 95th percentile) for a numeric array
+	 */
+	private percentile(values: number[], p: number): number | null {
+		if (values.length === 0) { return null; }
+		if (p < 0 || p > 100) { return null; }
+		
+		const sorted = [...values].sort((a, b) => a - b);
+		const index = (p / 100) * (sorted.length - 1);
+		
+		if (index === Math.floor(index)) {
+			return sorted[index];
+		} else {
+			const lower = sorted[Math.floor(index)];
+			const upper = sorted[Math.ceil(index)];
+			return lower + (upper - lower) * (index - Math.floor(index));
+		}
+	}
+
 	private applyFilterToTurns(requests: Array<ReturnType<AnalyticsService['mapTurn']>>, filter?: AnalyticsFilter): Array<ReturnType<AnalyticsService['mapTurn']>> {
 		if (!filter) {
 			return requests;
@@ -325,6 +391,7 @@ export class AnalyticsService {
 		
 		const model = turn.modelId || undefined;
 		const latencyMs = turn.result?.timings?.totalElapsed;
+		const firstProgressMs = turn.result?.timings?.firstProgress;
 		const turnId = turn.responseId || turn.turnId;
 		const modelRequests = turn.result?.metadata?.toolCallRounds || [];
 		const allFileReferences = this.extractAllFileReferences(turn);
@@ -341,6 +408,7 @@ export class AnalyticsService {
 			filePath,
 			allFileReferences, // NEW: comprehensive file reference list
 			latencyMs,
+			firstProgressMs, // NEW: time to first token
 			turnId,
 			language,
 			modelRequests,

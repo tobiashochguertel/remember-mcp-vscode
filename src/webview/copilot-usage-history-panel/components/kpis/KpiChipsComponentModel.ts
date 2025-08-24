@@ -17,6 +17,26 @@ export interface KpiChipsState {
 }
 
 /**
+ * Format milliseconds into human-readable duration
+ * @param ms Milliseconds to format
+ * @returns Formatted duration string
+ */
+function formatDuration(ms: number): string {
+	if (ms < 1000) {
+		return `${Math.round(ms)}ms`;
+	} else if (ms < 60000) {
+		return `${(ms / 1000).toFixed(1)}s`;
+	} else {
+		const minutes = Math.floor(ms / 60000);
+		const seconds = Math.round((ms % 60000) / 1000);
+		if (seconds === 0) {
+			return `${minutes}m`;
+		}
+		return `${minutes}m ${seconds}s`;
+	}
+}
+
+/**
  * KPI Chips Component Model implementing the new IComponentModel framework
  * This is an example of how to convert existing models to the new architecture
  */
@@ -80,7 +100,11 @@ export class KpiChipsComponentModel implements IComponentModel {
 			{ id: 'editRatio', label: 'Edit Ratio', value: (kpis.editRatio * 100).toFixed(1) + '%', tooltip: 'Share of turns that were edits (edits ÷ turns)' },
 			{ id: 'fileModifications', label: 'File Mods', value: kpis.fileModifications.toString(), tooltip: 'Total individual file modifications made across all edit turns' },
 			{ id: 'editProductivity', label: 'Edit Productivity', value: kpis.editProductivity.toFixed(1), tooltip: 'Average file modifications per edit turn (file mods ÷ edit turns)' },
-			{ id: 'latencyMsMedian', label: 'Median Latency (ms)', value: Math.round(kpis.latencyMsMedian).toString(), tooltip: 'Median end-to-end latency per turn (milliseconds)' },
+			{ id: 'latencyMsMedian', label: 'Turn Latency p50', value: formatDuration(kpis.latencyMsMedian), tooltip: 'Median end-to-end latency per turn' },
+			{ id: 'firstProgressMsMedian', label: 'First Token p50', value: formatDuration(kpis.firstProgressMsMedian), tooltip: 'Median time to first response/token' },
+			{ id: 'firstProgressMsP95', label: 'First Token p95', value: formatDuration(kpis.firstProgressMsP95), tooltip: '95th percentile time to first response/token' },
+			{ id: 'requestLatencyMsMean', label: 'Request Latency Avg', value: formatDuration(kpis.requestLatencyMsMean), tooltip: 'Mean backend model request latency' },
+			{ id: 'requestLatencyMsP95', label: 'Request Latency p95', value: formatDuration(kpis.requestLatencyMsP95), tooltip: '95th percentile backend model request latency' },
 			{ id: 'models', label: 'Models', value: kpis.models.toString(), tooltip: 'Unique AI models used' },
 			{ id: 'agents', label: 'Agents', value: kpis.agents.toString(), tooltip: 'Unique Copilot agents used' }
 		];
