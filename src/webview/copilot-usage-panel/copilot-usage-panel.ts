@@ -85,15 +85,6 @@ export class CopilotUsagePanel implements vscode.WebviewViewProvider, vscode.Dis
 			case 'refresh':
 				await this.handleRefresh();
 				break;
-			case 'requestProgressUpdate':
-				// Client requesting a progress update (called every 30 seconds)
-				// This will trigger a re-render with current progress state
-				try {
-					await this._view?.render();
-				} catch (error) {
-					this.logger.error('Error rendering progress update:', error);
-				}
-				break;
 			case 'setModel':
 				try {
 					const model = typeof message.model === 'string' ? message.model : '';
@@ -231,20 +222,14 @@ export class CopilotUsagePanel implements vscode.WebviewViewProvider, vscode.Dis
 	/**
 	 * Record a chat session update (called when chat session files are updated)
 	 */
-	public recordChatSessionUpdate(timestamp?: number): void {
-		if (this._model) {
-			this._model.recordChatSessionUpdate(timestamp);
-			this.logger.info('Chat session update recorded');
-		}
+	public recordChatSessionUpdate(_timestamp?: number): void {
+		// No-op: progress UI removed
 	}
 
 	/**
-	 * Reset the progress bar (for manual testing or when needed)
+	 * Reset progress (legacy no-op for compatibility)
 	 */
 	public resetProgress(): void {
-		if (this._model) {
-			this._model.resetProgress();
-			this.logger.info('Progress bar reset');
-		}
+		// No-op: progress UI removed
 	}
 }

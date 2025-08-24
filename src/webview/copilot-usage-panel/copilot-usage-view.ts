@@ -4,7 +4,6 @@ import { ILogger } from '../../types/logger';
 import { CopilotUsagePanelModel } from './copilot-usage-panel-model';
 import { UsageStatsView } from './components/usage-stats/UsageStatsView';
 import { SessionAnalysisView } from './components/session-analysis/SessionAnalysisView';
-import { UpdateProgressView } from './components/update-progress/UpdateProgressView';
 
 /**
  * View for Copilot Usage Panel (micro-MVVM)
@@ -13,7 +12,6 @@ import { UpdateProgressView } from './components/update-progress/UpdateProgressV
 export class CopilotUsageView {
 	private readonly usageStatsView: UsageStatsView;
 	private readonly sessionAnalysisView: SessionAnalysisView;
-	private readonly updateProgressView: UpdateProgressView;
 
 	constructor(
 		private readonly _webview: vscode.Webview,
@@ -23,7 +21,6 @@ export class CopilotUsageView {
 	) {
 		this.usageStatsView = new UsageStatsView();
 		this.sessionAnalysisView = new SessionAnalysisView();
-		this.updateProgressView = new UpdateProgressView();
 
 		this._model.onDataChanged(async () => {
 			try {
@@ -48,9 +45,6 @@ export class CopilotUsageView {
 		
 		const analysisVm = this._model.sessionAnalysisViewModel;
 		const analysisSection = this.sessionAnalysisView.render(analysisVm.getState());
-		
-		const progressVm = this._model.updateProgressViewModel;
-		const progressSection = this.updateProgressView.render(progressVm.getState());
 
 		return `<!DOCTYPE html>
         <html lang="en">
@@ -68,12 +62,10 @@ export class CopilotUsageView {
                 }
                 .flash-row { animation: flash-blink 0.8s ease; }
                 .card { margin-bottom: 12px; }
-                ${this.updateProgressView.getStyles()}
             </style>
         </head>
         <body>
             <div class="summary">Track and analyze Copilot model usage in real time as you work.</div>
-            ${progressSection}
             ${statsSection}
             ${analysisSection}
             ${sharedScript}
@@ -85,7 +77,6 @@ export class CopilotUsageView {
                 })();
             </script>
             <script>
-                ${this.updateProgressView.getClientInitScript()}
                 ${this.usageStatsView.getClientInitScript()}
                 ${this.sessionAnalysisView.getClientInitScript()}
             </script>

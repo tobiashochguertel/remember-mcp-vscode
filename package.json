@@ -72,13 +72,7 @@
         "title": "Clear Usage Statistics",
         "category": "Remember MCP",
         "icon": "$(clear-all)"
-      },
-      {
-        "command": "remember-mcp.testProgressUpdate",
-        "title": "Test Progress Update",
-        "category": "Remember MCP",
-        "icon": "$(clock)"
-      },
+  },
       {
         "command": "remember-mcp.showUsageHistory",
         "title": "Show Copilot Usage History",

@@ -261,6 +261,10 @@ export class CopilotUsageHistoryView {
 					margin-bottom: 16px;
 					width: 200px;
 					transition: background-color 0.2s ease;
+					display: inline-flex;
+					align-items: center;
+					justify-content: center;
+					gap: 8px;
 				}
 				
 				.cta-button:hover {
@@ -281,6 +285,24 @@ export class CopilotUsageHistoryView {
 				
 				.cta-button:disabled:hover {
 					background-color: var(--vscode-button-secondaryBackground);
+				}
+
+				/* Lightweight spinner that respects VS Code theme tokens */
+				.spinner {
+					display: inline-block;
+					width: 14px;
+					height: 14px;
+					border-radius: 50%;
+					border: 2px solid transparent;
+					border-top-color: var(--vscode-progressBar-foreground, var(--vscode-focusBorder));
+					border-right-color: var(--vscode-progressBar-foreground, var(--vscode-focusBorder));
+					animation: spin 0.8s linear infinite;
+				}
+
+				@keyframes spin { to { transform: rotate(360deg); } }
+
+				@media (prefers-reduced-motion: reduce) {
+					.spinner { animation: none; }
 				}
 				
 				.secondary-action {
@@ -308,8 +330,8 @@ export class CopilotUsageHistoryView {
 					scanning your chat sessions for usage events.
 				</div>
 				
-				<button class="cta-button" id="scanButton" ${this._model.isScanning() ? 'disabled' : ''}>
-					${this._model.isScanning() ? 'Scanning...' : 'Scan Chat Sessions'}
+				<button class="cta-button" id="scanButton" ${this._model.isScanning() ? 'disabled aria-busy="true"' : ''}>
+					${this._model.isScanning() ? '<span class="spinner" aria-hidden="true"></span><span>Scanning...</span>' : 'Scan Chat Sessions'}
 				</button>
 			</div>
 			
