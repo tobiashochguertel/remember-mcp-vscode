@@ -154,13 +154,13 @@ export class CopilotUsageHistoryView {
 		}
 
 		// Render all components directly
-		const kpisHTML = await this.kpisComponent.render();
 		const filtersHTML = await this.filtersComponent.render();
-		const modelsHTML = await this.modelsComponent.render();
+		const kpisHTML = await this.kpisComponent.render();
+		const chartHTML = await this.chartComponent.render();
 		const agentsHTML = await this.agentsComponent.render();
+		const modelsHTML = await this.modelsComponent.render();
 		const activityHTML = await this.activityComponent.render();
 		const insightsHTML = await this.insightsComponent.render();
-		const chartHTML = await this.chartComponent.render();
 
 		const chartJsUri = this.getChartJsUri();
 		const styles = await this.getWebviewStyles();
@@ -173,16 +173,17 @@ export class CopilotUsageHistoryView {
 			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'unsafe-eval' vscode-resource:; font-src 'self' data:;">
 			<title>Copilot Usage History</title>
 			<script src="${chartJsUri}"></script>
+			${WebviewUtils.getSharedScript()}
 			${styles}
 		</head>
 		<body>
-			${kpisHTML}
 			${filtersHTML}
-			${modelsHTML}
+			${kpisHTML}
+			${chartHTML}
 			${agentsHTML}
+			${modelsHTML}
 			${activityHTML}
 			${insightsHTML}
-			${chartHTML}
 			
 			<script>
 			// Generic message handling using data attributes

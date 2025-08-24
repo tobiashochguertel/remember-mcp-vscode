@@ -26,20 +26,17 @@ export class DailyRequestsChartView extends ComponentBase {
 	private viewModel: DailyRequestsChartViewModel;
 
 	constructor(
-		webview: vscode.Webview,
+		private webview: vscode.Webview,
 		private model: any, // Model reference for accessing viewModel
 		private logger: ILogger
 	) {
-		super(webview, 'daily-requests-chart-container');
+		super('daily-requests-chart-container');
 		this.viewModel = this.model.dailyRequestsChartViewModel;
 
-		// Subscribe to model changes and update when data changes
+		// Subscribe to model changes - component will be re-rendered when view calls render()
 		this.viewModel.onDidChange(() => {
-			this.onStateChanged();
+			// Component will be re-rendered when the view calls render()
 		});
-
-		// Don't send initial content immediately - wait for refreshComponentViews()
-		// this.onStateChanged();
 	}
 
 	/**
@@ -163,49 +160,19 @@ export class DailyRequestsChartView extends ComponentBase {
 				</div>
 				<script>
 					(function() {
-						console.log('DailyRequestsChart: Script executing for canvas ${canvasId}');
+						const canvas = document.getElementById('${canvasId}');
+						if (!canvas) {
+							console.error('DailyRequestsChart: Canvas ${canvasId} not found');
+							return;
+						}
+
+						const config = ${JSON.stringify(chartConfig)};
 						
-						// Build and render this specific chart using the shared helper
-						const boot = () => {
-							console.log('DailyRequestsChart: Boot function called');
-							const canvas = document.getElementById('${canvasId}');
-							if (!canvas) {
-								console.error('DailyRequestsChart: Canvas ${canvasId} not found');
-								return;
-							}
-
-							const config = ${JSON.stringify(chartConfig)};
-							console.log('DailyRequestsChart: Config prepared', config);
-
-							if (window.__chartKit) {
-								console.log('DailyRequestsChart: Using __chartKit to render');
-								window.__chartKit.render(canvas, config);
-							} else {
-								console.warn('DailyRequestsChart: __chartKit not available, waiting...');
-								// Fallback wait until shared script loads
-								const wait = setInterval(() => {
-									if (window.__chartKit) {
-										clearInterval(wait);
-										console.log('DailyRequestsChart: __chartKit now available, rendering');
-										window.__chartKit.render(canvas, config);
-									}
-								}, 50);
-								
-								// Timeout after 5 seconds
-								setTimeout(() => {
-									clearInterval(wait);
-									console.error('DailyRequestsChart: Timeout waiting for __chartKit');
-								}, 5000);
-							}
-						};
-
-						// If Chart.js may not be ready yet, utilize helper's whenChartReady when present
-						if (window.__chartKit && window.__chartKit.whenChartReady) {
-							console.log('DailyRequestsChart: Using whenChartReady');
-							window.__chartKit.whenChartReady(boot);
+						// Use the shared chart kit helper for proper Chart.js integration
+						if (window.__chartKit) {
+							window.__chartKit.render(canvas, config);
 						} else {
-							console.log('DailyRequestsChart: Calling boot directly');
-							boot();
+							console.error('DailyRequestsChart: __chartKit not available');
 						}
 					})();
 				</script>
@@ -213,11 +180,4 @@ export class DailyRequestsChartView extends ComponentBase {
 		`;
 	}
 
-	/**
-	 * Called when the model state changes - component updates itself
-	 */
-	private onStateChanged(): void {
-		const html = this.render();
-		this.updateView(html);
-	}
 }

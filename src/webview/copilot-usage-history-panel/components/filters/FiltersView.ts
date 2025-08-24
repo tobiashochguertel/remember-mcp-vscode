@@ -108,40 +108,23 @@ export class FiltersView extends ComponentBase {
 		const modelOptions = (state.modelOptions || []).map((id: string) => `<option value="${id}" ${id===state.modelId?'selected':''}>${id}</option>`).join('');
 
 		return `
-			<section class="panel-section" aria-label="Filters">
-				<h2>Filters</h2>
-				<div class="filter-row">
-					<div class="filter-group">
-						<label for="flt_time">Time Range:</label>
-						<select id="flt_time" data-action="applyFilter" data-component="filters" data-filter="timeRange" class="vscode-select">
-							${timeOptions.map(o => `<option value="${o.v}" ${o.v===state.timeRange?'selected':''}>${o.l}</option>`).join('')}
-						</select>
-					</div>
-					<div class="filter-group">
-						<label for="flt_ws">Workspace:</label>
-						<select id="flt_ws" data-action="applyFilter" data-component="filters" data-filter="workspace" class="vscode-select">
-							${wsOptions.map(o => `<option value="${o.v}" ${o.v===state.workspace?'selected':''}>${o.l}</option>`).join('')}
-						</select>
-					</div>
-					<div class="filter-group">
-						<label for="flt_agent">Agent:</label>
-						<select id="flt_agent" data-action="applyFilter" data-component="filters" data-filter="agentId" class="vscode-select">
-							<option value="">All Agents</option>
-							${agentOptions}
-						</select>
-					</div>
-					<div class="filter-group">
-						<label for="flt_model">Model:</label>
-						<select id="flt_model" data-action="applyFilter" data-component="filters" data-filter="modelId" class="vscode-select">
-							<option value="">All Models</option>
-							${modelOptions}
-						</select>
-					</div>
-					<div class="filter-group">
-						<button id="flt_refresh" data-action="refresh" data-component="filters" class="vscode-button">Refresh</button>
-					</div>
-				</div>
-			</section>
+			<div class="filters" id="filters_bar">
+				<select id="flt_time" data-action="applyFilter" data-component="filters" data-filter="timeRange" class="vscode-select">
+					${timeOptions.map(o => `<option value="${o.v}" ${o.v===state.timeRange?'selected':''}>${o.l}</option>`).join('')}
+				</select>
+				<select id="flt_ws" data-action="applyFilter" data-component="filters" data-filter="workspace" class="vscode-select">
+					${wsOptions.map(o => `<option value="${o.v}" ${o.v===state.workspace?'selected':''}>${o.l}</option>`).join('')}
+				</select>
+				<select id="flt_agent" data-action="applyFilter" data-component="filters" data-filter="agentId" class="vscode-select">
+					<option value="">Agent</option>
+					${agentOptions}
+				</select>
+				<select id="flt_model" data-action="applyFilter" data-component="filters" data-filter="modelId" class="vscode-select">
+					<option value="">Model</option>
+					${modelOptions}
+				</select>
+				<button id="flt_refresh" data-action="refresh" data-component="filters" class="vscode-button">Refresh</button>
+			</div>
 		`;
 	}
 
