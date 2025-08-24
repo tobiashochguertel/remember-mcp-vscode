@@ -8,14 +8,14 @@ import { KpiChipsView } from './components/kpis/KpiChipsView';
 import { AgentsListView } from './components/agents/AgentsListView';
 import { ModelsListView } from './components/models/ModelsListView';
 import { ActivityFeedView } from './components/activity/ActivityFeedView';
-import { DailyRequestsChartView } from './components/charts/DailyRequestsChartView';
+import { DailyRequestsChartView } from './components/request-chart/DailyRequestsChartView';
 import { IComponent } from './components/shared/ComponentBase';
 import { IComponentModel } from './components/shared/IComponentModel';
 
 // New component models
 import { FiltersComponentModel } from './components/filters/FiltersComponentModel';
 import { KpiChipsComponentModel } from './components/kpis/KpiChipsComponentModel';
-import { DailyRequestsChartComponentModel } from './components/charts/DailyRequestsChartComponentModel';
+import { DailyRequestsChartComponentModel } from './components/request-chart/DailyRequestsChartComponentModel';
 import { AgentsListComponentModel } from './components/agents/AgentsListComponentModel';
 import { ModelsListComponentModel } from './components/models/ModelsListComponentModel';
 import { ActivityFeedComponentModel } from './components/activity/ActivityFeedComponentModel';
