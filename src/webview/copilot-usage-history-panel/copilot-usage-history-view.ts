@@ -2,44 +2,22 @@ import * as vscode from 'vscode';
 import { CopilotUsageHistoryModel } from './copilot-usage-history-model';
 import { WebviewUtils } from '../shared/webview-utils';
 import { ILogger } from '../../types/logger';
-import { FiltersView } from './components/filters/FiltersView';
-import { KpiChipsView } from './components/kpis/KpiChipsView';
-import { AgentsListView } from './components/agents/AgentsListView';
-import { ModelsListView } from './components/models/ModelsListView';
-import { ActivityFeedView } from './components/activity/ActivityFeedView';
-import { DailyRequestsChartView } from './components/charts/DailyRequestsChartView';
-import { ComponentMessage } from './components/shared/ComponentBase';
-import { InsightsView } from './components/insights/InsightsView';
+import { ComponentMessage, IComponent } from './components/shared/ComponentBase';
 
 /**
  * View Coordinator for Copilot Usage History Panel
  * Manages component lifecycle and coordinates updates between model and view
  */
 export class CopilotUsageHistoryView {
-	// Get component references for direct rendering
-	private readonly kpisComponent: KpiChipsView;
-	private readonly filtersComponent: FiltersView;
-	private readonly agentsComponent: AgentsListView;
-	private readonly modelsComponent: ModelsListView;
-	private readonly activityComponent: ActivityFeedView;
-	private readonly insightsComponent: InsightsView;
-	private readonly chartComponent: DailyRequestsChartView;
 	private _disposables: vscode.Disposable[] = [];
 
 	constructor(
 		private readonly _webview: vscode.Webview,
 		private readonly _model: CopilotUsageHistoryModel,
 		private readonly _extensionUri: vscode.Uri,
-		private readonly _logger: ILogger
+		private readonly _logger: ILogger,
+		private readonly _components: IComponent[]
 	) {
-		// Initialize components with the webview and model
-		this.kpisComponent = new KpiChipsView(this._webview, this._model, this._logger);
-		this.filtersComponent = new FiltersView(this._webview, this._model, this._logger);
-		this.agentsComponent = new AgentsListView(this._webview, this._model, this._logger);
-		this.modelsComponent = new ModelsListView(this._webview, this._model, this._logger);
-		this.activityComponent = new ActivityFeedView(this._webview, this._model, this._logger);
-		this.insightsComponent = new InsightsView(this._webview, this._model, this._logger);
-		this.chartComponent = new DailyRequestsChartView(this._webview, this._model, this._logger);
 
 		// Set up data binding: model changes update the view (for non-PostMessage components)
 		this._model.onDataChanged(async () => {
@@ -56,16 +34,8 @@ export class CopilotUsageHistoryView {
 	/**
 	 * Get all components for iteration
 	 */
-	private getAllComponents() {
-		return [
-			this.kpisComponent,
-			this.filtersComponent,
-			this.agentsComponent,
-			this.modelsComponent,
-			this.activityComponent,
-			this.insightsComponent,
-			this.chartComponent
-		];
+	private getAllComponents(): IComponent[] {
+		return this._components;
 	}
 
 	/**
@@ -153,14 +123,8 @@ export class CopilotUsageHistoryView {
 			return await this.generateSimpleNoDataHtml();
 		}
 
-		// Render all components directly
-		const filtersHTML = await this.filtersComponent.render();
-		const kpisHTML = await this.kpisComponent.render();
-		const chartHTML = await this.chartComponent.render();
-		const agentsHTML = await this.agentsComponent.render();
-		const modelsHTML = await this.modelsComponent.render();
-		const activityHTML = await this.activityComponent.render();
-		const insightsHTML = await this.insightsComponent.render();
+		// Render all components in the order they were provided
+		const componentHTML = this._components.map(component => component.render()).join('\n\t\t\t');
 
 		const chartJsUri = this.getChartJsUri();
 		const styles = await this.getWebviewStyles();
@@ -177,13 +141,7 @@ export class CopilotUsageHistoryView {
 			${styles}
 		</head>
 		<body>
-			${filtersHTML}
-			${kpisHTML}
-			${chartHTML}
-			${agentsHTML}
-			${modelsHTML}
-			${activityHTML}
-			${insightsHTML}
+			${componentHTML}
 			
 			<script>
 			// Generic message handling using data attributes

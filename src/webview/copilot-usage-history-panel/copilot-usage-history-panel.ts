@@ -7,6 +7,14 @@ import { ServiceContainer } from '../../types/service-container';
 import { ILogger } from '../../types/logger';
 import { CopilotUsageHistoryModel } from './copilot-usage-history-model';
 import { CopilotUsageHistoryView } from './copilot-usage-history-view';
+import { FiltersView } from './components/filters/FiltersView';
+import { KpiChipsView } from './components/kpis/KpiChipsView';
+import { AgentsListView } from './components/agents/AgentsListView';
+import { ModelsListView } from './components/models/ModelsListView';
+import { ActivityFeedView } from './components/activity/ActivityFeedView';
+import { DailyRequestsChartView } from './components/charts/DailyRequestsChartView';
+import { InsightsView } from './components/insights/InsightsView';
+import { IComponent } from './components/shared/ComponentBase';
 
 export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vscode.Disposable {
 	public static readonly viewType = 'copilot-usage-history-panel';
@@ -49,7 +57,20 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 
 			// Initialize model and view immediately (before data service is fully ready)
 			this._model = new CopilotUsageHistoryModel(this.context, unifiedData, analytics, this.logger);
-			this._view = new CopilotUsageHistoryView(webviewView.webview, this._model, this.extensionUri, this.logger);
+			
+			// Create all components that the view will manage
+			const components: IComponent[] = [
+				new FiltersView(webviewView.webview, this._model, this.logger),
+				new KpiChipsView(webviewView.webview, this._model, this.logger),
+				new DailyRequestsChartView(webviewView.webview, this._model, this.logger),
+				new AgentsListView(webviewView.webview, this._model, this.logger),
+				new ModelsListView(webviewView.webview, this._model, this.logger),
+				new ActivityFeedView(webviewView.webview, this._model, this.logger),
+				new InsightsView(webviewView.webview, this._model, this.logger)
+			];
+			
+			// Create view with injected components
+			this._view = new CopilotUsageHistoryView(webviewView.webview, this._model, this.extensionUri, this.logger, components);
 
 			// Handle messages from the webview
 			const messageHandler = webviewView.webview.onDidReceiveMessage(async (message) => {
