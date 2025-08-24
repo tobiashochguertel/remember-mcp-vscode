@@ -60,10 +60,6 @@ export class FiltersView extends ComponentBase {
 				}
 				return true;
 				
-			case 'refresh':
-				this.componentModel.handle({ type: 'refresh' });
-				return true;
-				
 			default:
 				return false;
 		}
@@ -114,7 +110,6 @@ export class FiltersView extends ComponentBase {
 					<option value="">Model</option>
 					${modelOptions}
 				</select>
-				<button id="flt_refresh" data-action="refresh" data-component="filters" class="vscode-button">Refresh</button>
 			</div>
 		`;
 	}

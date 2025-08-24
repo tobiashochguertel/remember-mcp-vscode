@@ -4,8 +4,7 @@ import type { CopilotUsageHistoryModel, GlobalFilters } from '../../copilot-usag
 import type { ILogger } from '../../../../types/logger';
 
 export type FiltersEvent =
-	| { type: 'applyFilter'; patch: Partial<FiltersState> }
-	| { type: 'refresh' };
+	| { type: 'applyFilter'; patch: Partial<FiltersState> };
 
 /**
  * Filters Component Model implementing the new IComponentModel framework
@@ -64,10 +63,6 @@ export class FiltersComponentModel implements IComponentModel {
 					}
 					// Note: agentIds/modelIds from UI handled directly via GlobalFilters properties
 					await this.model.updateFilters(filters);
-					break;
-				}
-				case 'refresh': {
-					await this.model.refreshAllData();
 					break;
 				}
 			}
