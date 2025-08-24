@@ -102,13 +102,13 @@ export class CopilotUsageHistoryModel {
 
 	// Backward compatibility properties for views
 	public get filtersViewModel(): any {
-		const adapter = this.getComponentModel('filters') as any;
-		return adapter?.legacyModel;
+		// Direct access for converted models
+		return this.getComponentModel('filters');
 	}
 
 	public get kpiChipsViewModel(): any {
-		const adapter = this.getComponentModel('kpis') as any;
-		return adapter?.legacyModel;
+		// Direct access for converted models
+		return this.getComponentModel('kpis');
 	}
 
 	public get agentsListViewModel(): any {
@@ -127,8 +127,8 @@ export class CopilotUsageHistoryModel {
 	}
 
 	public get dailyRequestsChartViewModel(): any {
-		const adapter = this.getComponentModel('charts') as any;
-		return adapter?.legacyModel;
+		// Return the new component model directly (it has backward compatible methods)
+		return this.getComponentModel('charts');
 	}
 
 	/**

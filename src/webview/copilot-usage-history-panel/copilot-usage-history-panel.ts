@@ -13,13 +13,15 @@ import { InsightsView } from './components/insights/InsightsView';
 import { IComponent } from './components/shared/ComponentBase';
 import { IComponentModel } from './components/shared/IComponentModel';
 
-// Temporary imports for existing view models (will be removed as we convert them)
-import { FiltersViewModel } from './components/filters/FiltersViewModel';
-import { KpiChipsViewModel } from './components/kpis/KpiChipsViewModel';
+// Temporary imports for remaining view models (will be removed as we convert them)
 import { AgentsListViewModel } from './components/agents/AgentsListViewModel';
 import { ModelsListViewModel } from './components/models/ModelsListViewModel';
 import { ActivityFeedViewModel } from './components/activity/ActivityFeedViewModel';
-import { DailyRequestsChartViewModel } from './components/charts/DailyRequestsChartViewModel';
+
+// New component models
+import { FiltersComponentModel } from './components/filters/FiltersComponentModel';
+import { KpiChipsComponentModel } from './components/kpis/KpiChipsComponentModel';
+import { DailyRequestsChartComponentModel } from './components/charts/DailyRequestsChartComponentModel';
 
 /**
  * Temporary adapter to bridge existing view models to IComponentModel interface
@@ -103,15 +105,17 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 			// Initialize model first
 			this._model = new CopilotUsageHistoryModel(this.context, unifiedData, analytics, this.logger);
 			
-			// Create component models with specific dependencies (temporary - will be replaced when models are converted)
+			// Create component models with specific dependencies
 			const componentModels: IComponentModel[] = [
-				// Note: These are temporary adapters until we convert the existing models to IComponentModel
-				new ComponentModelAdapter('filters', new FiltersViewModel(this._model, this.logger)),
-				new ComponentModelAdapter('kpis', new KpiChipsViewModel(this._model, analytics, this.logger)),
+				// Converted to new framework
+				new FiltersComponentModel(this._model, this.logger),
+				new KpiChipsComponentModel(analytics, this.logger),
+				new DailyRequestsChartComponentModel(analytics, this.logger),
+				
+				// Still using adapters (to be converted)
 				new ComponentModelAdapter('agents', new AgentsListViewModel(this._model, analytics, this.logger)),
 				new ComponentModelAdapter('models', new ModelsListViewModel(this._model, analytics, this.logger)),
-				new ComponentModelAdapter('activity', new ActivityFeedViewModel(this._model, analytics, this.logger)),
-				new ComponentModelAdapter('charts', new DailyRequestsChartViewModel(this._model, analytics, this.logger))
+				new ComponentModelAdapter('activity', new ActivityFeedViewModel(this._model, analytics, this.logger))
 			];
 
 			// Inject component models into main model

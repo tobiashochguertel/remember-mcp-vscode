@@ -1,5 +1,5 @@
 import { ComponentBase, ComponentMessage } from '../shared/ComponentBase';
-import { KpiChipsViewModel } from './KpiChipsViewModel';
+import { KpiChipsComponentModel } from './KpiChipsComponentModel';
 import { CopilotUsageHistoryModel } from '../../copilot-usage-history-model';
 import { ILogger } from '../../../../types/logger';
 import * as vscode from 'vscode';
@@ -13,7 +13,7 @@ export interface KpiChipsRenderState {
  * KPI Chips Component - manages its own state and rendering via PostMessage
  */
 export class KpiChipsView extends ComponentBase {
-	private viewModel: KpiChipsViewModel;
+	private viewModel: KpiChipsComponentModel;
 
 	constructor(
 		webview: vscode.Webview,

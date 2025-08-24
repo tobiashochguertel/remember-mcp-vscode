@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ComponentBase, ComponentMessage } from '../shared/ComponentBase';
-import { DailyRequestsChartViewModel } from './DailyRequestsChartViewModel';
+import { DailyRequestsChartComponentModel } from './DailyRequestsChartComponentModel';
 import { ILogger } from '../../../../types/logger';
 
 export interface DailyRequestsChartRenderState {
@@ -23,7 +23,7 @@ export interface DailyRequestsChartRenderState {
  * Renders Chart.js bar chart showing requests per day
  */
 export class DailyRequestsChartView extends ComponentBase {
-	private viewModel: DailyRequestsChartViewModel;
+	private viewModel: DailyRequestsChartComponentModel;
 
 	constructor(
 		private webview: vscode.Webview,
@@ -76,9 +76,8 @@ export class DailyRequestsChartView extends ComponentBase {
 			`;
 		}
 
-		// Transform ViewModel data to Chart.js format
-		const labels = vmState.data.map(item => item.date);
-		const chartData = vmState.data.map(item => item.requests);
+		// Get chart data from the component model
+		const chartData = this.viewModel.getChartData();
 
 		const canvasId = 'dailyRequestsChart';
 		// Build chart config in TypeScript (use CSS var tokens; they'll be resolved in the webview)
@@ -86,11 +85,11 @@ export class DailyRequestsChartView extends ComponentBase {
 		const chartConfig = {
 			type: 'bar',
 			data: {
-				labels: labels,
+				labels: chartData.labels,
 				datasets: [
 					{
 						label: 'Requests',
-						data: chartData,
+						data: chartData.data,
 						backgroundColor: datasetColorToken,
 						borderColor: datasetColorToken,
 						borderWidth: 1,

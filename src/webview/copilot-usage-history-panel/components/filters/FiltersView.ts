@@ -1,5 +1,5 @@
 import { ComponentBase, ComponentMessage } from '../shared/ComponentBase';
-import { FiltersViewModel } from './FiltersViewModel';
+import { FiltersComponentModel } from './FiltersComponentModel';
 import { CopilotUsageHistoryModel } from '../../copilot-usage-history-model';
 import { ILogger } from '../../../../types/logger';
 import * as vscode from 'vscode';
@@ -22,7 +22,7 @@ export interface FiltersActions {
  * Filters Component - manages filter state and user interactions via PostMessage
  */
 export class FiltersView extends ComponentBase {
-	private viewModel: FiltersViewModel;
+	private viewModel: FiltersComponentModel;
 
 	constructor(
 		private webview: vscode.Webview,
