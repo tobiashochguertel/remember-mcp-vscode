@@ -20,7 +20,6 @@ export class DailyRequestsChartComponentModel implements IComponentModel {
 		isLoading: true, 
 		isEmpty: true 
 	};
-	private listeners: Array<() => void> = [];
 
 	constructor(
 		private readonly analyticsService: AnalyticsService,
@@ -56,16 +55,6 @@ export class DailyRequestsChartComponentModel implements IComponentModel {
 	}
 
 	/**
-	 * Subscribe to model changes (implements IComponentModel)
-	 */
-	onDidChange(listener: () => void): () => void {
-		this.listeners.push(listener);
-		return () => {
-			this.listeners = this.listeners.filter(l => l !== listener);
-		};
-	}
-
-	/**
 	 * Check if loading (implements IComponentModel)
 	 */
 	isLoading(): boolean {
@@ -76,7 +65,7 @@ export class DailyRequestsChartComponentModel implements IComponentModel {
 	 * Dispose resources (implements IComponentModel)
 	 */
 	dispose(): void {
-		this.listeners = [];
+		// No resources to dispose
 	}
 
 	// Legacy API methods for backward compatibility with existing views
@@ -145,12 +134,5 @@ export class DailyRequestsChartComponentModel implements IComponentModel {
 
 	private patch(p: Partial<DailyRequestsChartVMState>): void {
 		this.state = { ...this.state, ...p };
-		for (const l of this.listeners) {
-			try { 
-				l(); 
-			} catch (e) { 
-				this.logger.error('DailyRequestsChartComponentModel listener error', e); 
-			}
-		}
 	}
 }

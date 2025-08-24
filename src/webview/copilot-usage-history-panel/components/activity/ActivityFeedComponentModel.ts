@@ -15,7 +15,6 @@ export interface ActivityFeedVMState {
 export class ActivityFeedComponentModel implements IComponentModel {
 	public readonly id = 'activity';
 	private state: ActivityFeedVMState = { items: [], isLoading: true };
-	private listeners: Array<() => void> = [];
 
 	constructor(
 		private readonly analyticsService: AnalyticsService,
@@ -49,16 +48,6 @@ export class ActivityFeedComponentModel implements IComponentModel {
 	}
 
 	/**
-	 * Subscribe to model changes (implements IComponentModel)
-	 */
-	onDidChange(listener: () => void): () => void {
-		this.listeners.push(listener);
-		return () => {
-			this.listeners = this.listeners.filter(l => l !== listener);
-		};
-	}
-
-	/**
 	 * Check if loading (implements IComponentModel)
 	 */
 	isLoading(): boolean {
@@ -69,7 +58,7 @@ export class ActivityFeedComponentModel implements IComponentModel {
 	 * Dispose resources (implements IComponentModel)
 	 */
 	dispose(): void {
-		this.listeners = [];
+		// No resources to dispose
 	}
 
 	// Legacy API methods for backward compatibility with existing views
@@ -113,12 +102,5 @@ export class ActivityFeedComponentModel implements IComponentModel {
 
 	private patch(p: Partial<ActivityFeedVMState>): void {
 		this.state = { ...this.state, ...p };
-		for (const l of this.listeners) {
-			try { 
-				l(); 
-			} catch (e) { 
-				this.logger.error('ActivityFeedComponentModel listener error', e); 
-			}
-		}
 	}
 }

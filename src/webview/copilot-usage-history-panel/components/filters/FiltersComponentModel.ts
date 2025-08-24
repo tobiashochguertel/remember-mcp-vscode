@@ -13,7 +13,6 @@ export type FiltersEvent =
 export class FiltersComponentModel implements IComponentModel {
 	public readonly id = 'filters';
 	private state: FiltersState;
-	private listeners: Array<() => void> = [];
 
 	constructor(
 		private readonly model: CopilotUsageHistoryModel,
@@ -30,17 +29,6 @@ export class FiltersComponentModel implements IComponentModel {
 	async refresh(filters: GlobalFilters): Promise<void> {
 		// Update our state to match the current filters
 		this.state = this.fromGlobalFilters(filters);
-		this.notifyListeners();
-	}
-
-	/**
-	 * Subscribe to model changes (implements IComponentModel)
-	 */
-	onDidChange(listener: () => void): () => void {
-		this.listeners.push(listener);
-		return () => {
-			this.listeners = this.listeners.filter(l => l !== listener);
-		};
 	}
 
 	/**
@@ -54,19 +42,12 @@ export class FiltersComponentModel implements IComponentModel {
 	 * Dispose resources (implements IComponentModel)
 	 */
 	dispose(): void {
-		this.listeners = [];
+		// No resources to dispose
 	}
 
-	// Legacy API methods for backward compatibility with existing views
+	// Public API methods for views
 	getState(): FiltersState {
 		return this.state;
-	}
-
-	subscribe(listener: (state: FiltersState) => void): () => void {
-		this.listeners.push(() => listener(this.state));
-		return () => {
-			this.listeners = this.listeners.filter(l => l !== listener);
-		};
 	}
 
 	async handle(event: FiltersEvent): Promise<void> {
@@ -102,15 +83,5 @@ export class FiltersComponentModel implements IComponentModel {
 			agentOptions: [], // TODO: populate when agent/model filter selectors added
 			modelOptions: []
 		};
-	}
-
-	private notifyListeners(): void {
-		for (const l of this.listeners) {
-			try {
-				l();
-			} catch (e) {
-				this.logger.error('FiltersComponentModel listener error', e);
-			}
-		}
 	}
 }

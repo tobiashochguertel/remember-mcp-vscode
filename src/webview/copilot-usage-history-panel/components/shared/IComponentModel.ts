@@ -21,13 +21,6 @@ export interface IComponentModel {
 	refresh(filters: GlobalFilters): Promise<void>;
 
 	/**
-	 * Subscribe to model changes
-	 * @param listener Callback when model state changes
-	 * @returns Unsubscribe function
-	 */
-	onDidChange(listener: () => void): () => void;
-
-	/**
 	 * Dispose of the model and clean up resources
 	 */
 	dispose(): void;

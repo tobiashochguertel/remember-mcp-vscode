@@ -15,7 +15,6 @@ export interface ModelsListVMState {
 export class ModelsListComponentModel implements IComponentModel {
 	public readonly id = 'models';
 	private state: ModelsListVMState = { items: [], isLoading: true };
-	private listeners: Array<() => void> = [];
 
 	constructor(
 		private readonly analyticsService: AnalyticsService,
@@ -49,16 +48,6 @@ export class ModelsListComponentModel implements IComponentModel {
 	}
 
 	/**
-	 * Subscribe to model changes (implements IComponentModel)
-	 */
-	onDidChange(listener: () => void): () => void {
-		this.listeners.push(listener);
-		return () => {
-			this.listeners = this.listeners.filter(l => l !== listener);
-		};
-	}
-
-	/**
 	 * Check if loading (implements IComponentModel)
 	 */
 	isLoading(): boolean {
@@ -69,10 +58,10 @@ export class ModelsListComponentModel implements IComponentModel {
 	 * Dispose resources (implements IComponentModel)
 	 */
 	dispose(): void {
-		this.listeners = [];
+		// No resources to dispose
 	}
 
-	// Legacy API methods for backward compatibility with existing views
+	// Public API methods for views
 	getState(): ModelsListVMState { 
 		return this.state; 
 	}
@@ -113,12 +102,5 @@ export class ModelsListComponentModel implements IComponentModel {
 
 	private patch(p: Partial<ModelsListVMState>): void {
 		this.state = { ...this.state, ...p };
-		for (const l of this.listeners) {
-			try { 
-				l(); 
-			} catch (e) { 
-				this.logger.error('ModelsListComponentModel listener error', e); 
-			}
-		}
 	}
 }

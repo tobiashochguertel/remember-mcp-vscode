@@ -82,10 +82,4 @@ export interface ComponentView<TState = unknown, TActions = unknown> {
 	getClientInitScript?(): string;
 }
 
-export interface ComponentViewModel<TState = unknown, TEvent = unknown> {
-	getState(): TState;
-	subscribe(listener: (state: TState) => void): () => void;
-	handle(event: TEvent): void;
-}
-
 export type Unsubscribe = () => void;
