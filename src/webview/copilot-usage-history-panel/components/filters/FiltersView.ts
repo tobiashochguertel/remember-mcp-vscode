@@ -1,4 +1,8 @@
-import { ComponentView } from '../shared/ComponentBase';
+import { ComponentBase, ComponentMessage } from '../shared/ComponentBase';
+import { FiltersViewModel } from './FiltersViewModel';
+import { CopilotUsageHistoryModel } from '../../copilot-usage-history-model';
+import { ILogger } from '../../../../types/logger';
+import * as vscode from 'vscode';
 
 export interface FiltersState {
 	timeRange: 'today' | '7d' | '30d' | '90d' | 'all';
@@ -14,14 +18,93 @@ export interface FiltersActions {
 	refresh(): void;
 }
 
-export class FiltersView implements ComponentView<FiltersState, FiltersActions> {
-	private actions?: FiltersActions;
+/**
+ * Filters Component - manages filter state and user interactions via PostMessage
+ */
+export class FiltersView extends ComponentBase {
+	private viewModel: FiltersViewModel;
 
-	bind(actions: FiltersActions): void {
-		this.actions = actions; // Reserved for future server-side rendering callbacks
+	constructor(
+		webview: vscode.Webview,
+		private model: CopilotUsageHistoryModel,
+		private logger: ILogger
+	) {
+		super(webview, 'filters-container');
+		this.viewModel = this.model.filtersViewModel;
+
+		// Subscribe to model changes
+		this._disposables.push({
+			dispose: this.viewModel.subscribe(() => {
+				this.onStateChanged();
+			})
+		});
+
+		// Send initial content immediately
+		this.onStateChanged();
 	}
 
-	render(state: FiltersState): string {
+	/**
+	 * Handle messages related to filtering
+	 */
+	async handleMessage(message: ComponentMessage): Promise<boolean> {
+		switch (message.type) {
+			case 'applyFilter':
+				await this.handleApplyFilter(message);
+				return true;
+			case 'refresh':
+				await this.handleRefresh();
+				return true;
+			default:
+				return false;
+		}
+	}
+
+	/**
+	 * Handle filter application
+	 */
+	private async handleApplyFilter(message: ComponentMessage): Promise<void> {
+		try {
+			const patch: any = {};
+			if (message.timeRange) { patch.timeRange = message.timeRange; }
+			if (message.workspace) { patch.workspace = message.workspace; }
+			if (message.agentIds) { patch.agents = message.agentIds; }
+			if (message.modelIds) { patch.models = message.modelIds; }
+			
+			if (Object.keys(patch).length > 0) {
+				await this.model.updateFilters(patch);
+				this.logger.debug?.('Applied filter patch', patch);
+			}
+		} catch (error) {
+			this.logger.error('Failed to apply filter patch', error);
+		}
+	}
+
+	/**
+	 * Handle refresh request
+	 */
+	private async handleRefresh(): Promise<void> {
+		try {
+			await this.model.refreshAllData();
+			this.logger.info('Data refreshed from filters component');
+		} catch (error) {
+			this.logger.error('Error refreshing data from filters:', error);
+		}
+	}
+
+	/**
+	 * Render the filters HTML
+	 */
+	protected render(): string {
+		const filtersVmState = this.viewModel.getState();
+		const state: FiltersState = {
+			timeRange: filtersVmState.timeRange,
+			workspace: 'all',
+			agentOptions: filtersVmState.agentOptions,
+			modelOptions: filtersVmState.modelOptions,
+			agentId: undefined,
+			modelId: undefined
+		};
+
 		const timeOptions = [
 			{ v: 'today', l: 'Today' },
 			{ v: '7d', l: 'Last 7d' },
@@ -38,7 +121,6 @@ export class FiltersView implements ComponentView<FiltersState, FiltersActions> 
 		const modelOptions = (state.modelOptions || []).map((id: string) => `<option value="${id}" ${id===state.modelId?'selected':''}>${id}</option>`).join('');
 
 		return `
-			<section class="panel-section" aria-label="Filters">
 			<div class="filters" id="filters_bar">
 				<select id="flt_time" class="vscode-select">
 					${timeOptions.map(o => `<option value=\"${o.v}\" ${o.v===state.timeRange?'selected':''}>${o.l}</option>`).join('')}
@@ -56,30 +138,14 @@ export class FiltersView implements ComponentView<FiltersState, FiltersActions> 
 				</select>
 				<button id="flt_refresh" class="vscode-button">Refresh</button>
 			</div>
-			</section>
 		`;
 	}
 
-	getClientInitScript(): string {
-		return `
-			(function(){
-				const $ = (id) => document.getElementById(id);
-				const patch = () => {
-					const agentVal = $('flt_agent')?.value || '';
-					const modelVal = $('flt_model')?.value || '';
-					return {
-						timeRange: /** @type any */($('flt_time')?.value || '7d'),
-						workspace: /** @type any */($('flt_ws')?.value || 'all'),
-						agentIds: agentVal ? [agentVal] : [],
-						modelIds: modelVal ? [modelVal] : [],
-					};
-				};
-				$('flt_time')?.addEventListener('change', () => sendMessage('applyFilter', patch()));
-				$('flt_ws')?.addEventListener('change', () => sendMessage('applyFilter', patch()));
-				$('flt_agent')?.addEventListener('change', () => sendMessage('applyFilter', patch()));
-				$('flt_model')?.addEventListener('change', () => sendMessage('applyFilter', patch()));
-				$('flt_refresh')?.addEventListener('click', () => sendMessage('refresh'));
-			})();
-		`;
+	/**
+	 * Called when the model state changes - component updates itself
+	 */
+	private onStateChanged(): void {
+		const html = this.render();
+		this.updateView(html);
 	}
 }

@@ -1,4 +1,7 @@
-import { ComponentView } from '../shared/ComponentBase';
+import * as vscode from 'vscode';
+import { ComponentBase, ComponentMessage } from '../shared/ComponentBase';
+import { ModelsListViewModel } from './ModelsListViewModel';
+import { ILogger } from '../../../../types/logger';
 
 export interface ModelItem {
 	id: string;
@@ -11,8 +14,41 @@ export interface ModelsListState {
 	items: ModelItem[];
 }
 
-export class ModelsListView implements ComponentView<ModelsListState, never> {
-	render(state: ModelsListState): string {
+export class ModelsListView extends ComponentBase {
+	private viewModel: ModelsListViewModel;
+
+	constructor(
+		webview: vscode.Webview,
+		private model: any, // Model reference for accessing viewModel
+		private logger: ILogger
+	) {
+		super(webview, 'models-list-container');
+		this.viewModel = this.model.modelsListViewModel;
+
+		// Subscribe to model changes and update when data changes
+		this.viewModel.onDidChange(() => {
+			this.onStateChanged();
+		});
+
+		// Send initial content immediately
+		this.onStateChanged();
+	}
+
+	/**
+	 * Handle messages relevant to models list
+	 */
+	async handleMessage(_message: ComponentMessage): Promise<boolean> {
+		// Models list is read-only, so they don't handle any specific messages
+		// They update automatically when the model changes
+		return false;
+	}
+
+	/**
+	 * Render the models list HTML
+	 */
+	protected render(): string {
+		const state = this.viewModel.getState();
+
 		if (!state.items.length) {
 			return '<section class="models panel-section"><h4>Models</h4><div class="empty">No data</div></section>';
 		}
@@ -40,5 +76,13 @@ export class ModelsListView implements ComponentView<ModelsListState, never> {
 				</table>
 			</section>
 		`;
+	}
+
+	/**
+	 * Called when the model state changes - component updates itself
+	 */
+	private onStateChanged(): void {
+		const html = this.render();
+		this.updateView(html);
 	}
 }

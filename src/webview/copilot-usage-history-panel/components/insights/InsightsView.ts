@@ -1,4 +1,6 @@
-import { ComponentView } from '../shared/ComponentBase';
+import * as vscode from 'vscode';
+import { ComponentBase, ComponentMessage } from '../shared/ComponentBase';
+import { ILogger } from '../../../../types/logger';
 
 export interface InsightItem {
 	text: string;
@@ -9,18 +11,44 @@ export interface InsightsState {
 	collapsed?: boolean;
 }
 
-export class InsightsView implements ComponentView<InsightsState, never> {
-	render(state: InsightsState): string {
-		if (!state.items.length) {
-			return '';
-		}
+export class InsightsView extends ComponentBase {
+	constructor(
+		webview: vscode.Webview,
+		private model: any,
+		private logger: ILogger
+	) {
+		super(webview, 'insights-container');
+
+		// Initial paint
+		this.onStateChanged();
+	}
+
+	async handleMessage(_message: ComponentMessage): Promise<boolean> {
+		// Read-only component; no direct message handling
+		return false;
+	}
+
+	protected render(): string {
+		// Simple static insights for now
+		const items: InsightItem[] = [
+			{ text: 'Insights will be populated when data is available.' }
+		];
+		if (!items.length) { return ''; }
+
 		return `
 			<section class="insights panel-section">
 				<h4>Insights</h4>
 				<ul class="insight-list">
-					${state.items.slice(0, 3).map(i => `<li>${i.text}</li>`).join('')}
+					${items.slice(0, 3).map(i => `<li>${i.text}</li>`).join('')}
 				</ul>
 			</section>
 		`;
+	}
+
+	private onStateChanged(): void {
+		try {
+			this.logger.trace?.('InsightsView: state changed');
+		} catch {}
+		this.updateView(this.render());
 	}
 }

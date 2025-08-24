@@ -1,4 +1,7 @@
-import { ComponentView } from '../shared/ComponentBase';
+import * as vscode from 'vscode';
+import { ComponentBase, ComponentMessage } from '../shared/ComponentBase';
+import { AgentsListViewModel } from './AgentsListViewModel';
+import { ILogger } from '../../../../types/logger';
 
 export interface AgentItem {
 	id: string;
@@ -13,8 +16,41 @@ export interface AgentsListState {
 	isLoading?: boolean;
 }
 
-export class AgentsListView implements ComponentView<AgentsListState, never> {
-	render(state: AgentsListState): string {
+export class AgentsListView extends ComponentBase {
+	private viewModel: AgentsListViewModel;
+
+	constructor(
+		webview: vscode.Webview,
+		private model: any, // Model reference for accessing viewModel
+		private logger: ILogger
+	) {
+		super(webview, 'agents-list-container');
+		this.viewModel = this.model.agentsListViewModel;
+
+		// Subscribe to model changes and update when data changes
+		this.viewModel.onDidChange(() => {
+			this.onStateChanged();
+		});
+
+		// Send initial content immediately
+		this.onStateChanged();
+	}
+
+	/**
+	 * Handle messages relevant to agents list
+	 */
+	async handleMessage(_message: ComponentMessage): Promise<boolean> {
+		// Agents list is read-only, so they don't handle any specific messages
+		// They update automatically when the model changes
+		return false;
+	}
+
+	/**
+	 * Render the agents list HTML
+	 */
+	protected render(): string {
+		const state = this.viewModel.getState();
+
 		if (state.isLoading) {
 			return '<section class="agents panel-section"><h4>Agents</h4><div class="empty">Loading...</div></section>';
 		}
@@ -45,5 +81,13 @@ export class AgentsListView implements ComponentView<AgentsListState, never> {
 				</table>
 			</section>
 		`;
+	}
+
+	/**
+	 * Called when the model state changes - component updates itself
+	 */
+	private onStateChanged(): void {
+		const html = this.render();
+		this.updateView(html);
 	}
 }

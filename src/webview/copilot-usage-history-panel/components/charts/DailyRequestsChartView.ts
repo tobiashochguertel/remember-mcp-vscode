@@ -1,4 +1,7 @@
-import { ComponentView } from '../shared/ComponentBase';
+import * as vscode from 'vscode';
+import { ComponentBase, ComponentMessage } from '../shared/ComponentBase';
+import { DailyRequestsChartViewModel } from './DailyRequestsChartViewModel';
+import { ILogger } from '../../../../types/logger';
 
 export interface DailyRequestsChartRenderState {
 	labels: string[];
@@ -19,29 +22,66 @@ export interface DailyRequestsChartRenderState {
  * View component for daily requests bar chart
  * Renders Chart.js bar chart showing requests per day
  */
-export class DailyRequestsChartView implements ComponentView<DailyRequestsChartRenderState, never> {
-	render(state: DailyRequestsChartRenderState): string {
-		if (state.isLoading) {
+export class DailyRequestsChartView extends ComponentBase {
+	private viewModel: DailyRequestsChartViewModel;
+
+	constructor(
+		webview: vscode.Webview,
+		private model: any, // Model reference for accessing viewModel
+		private logger: ILogger
+	) {
+		super(webview, 'daily-requests-chart-container');
+		this.viewModel = this.model.dailyRequestsChartViewModel;
+
+		// Subscribe to model changes and update when data changes
+		this.viewModel.onDidChange(() => {
+			this.onStateChanged();
+		});
+
+		// Send initial content immediately
+		this.onStateChanged();
+	}
+
+	/**
+	 * Handle messages relevant to daily requests chart
+	 */
+	async handleMessage(_message: ComponentMessage): Promise<boolean> {
+		// Chart is read-only, so they don't handle any specific messages
+		// They update automatically when the model changes
+		return false;
+	}
+
+	/**
+	 * Render the daily requests chart HTML
+	 */
+	protected render(): string {
+		const vmState = this.viewModel.getState();
+
+		if (vmState.isLoading) {
 			return `
 				<section class="daily-requests-chart">
-					<h4>${state.title ?? 'Daily Requests'}</h4>
+					<h4>Daily Requests</h4>
 					<div class="chart-container" style="position: relative; height: 200px; text-align: center; display: flex; align-items: center; justify-content: center;">
-						<div style="color: var(--vscode-descriptionForeground);">${state.loadingText ?? 'Loading chart...'}</div>
+						<div style="color: var(--vscode-descriptionForeground);">Loading chart...</div>
 					</div>
 				</section>
 			`;
 		}
 
-		if (state.isEmpty) {
+		if (vmState.isEmpty) {
 			return `
 				<section class="daily-requests-chart">
-					<h4>${state.title ?? 'Daily Requests'}</h4>
+					<h4>Daily Requests</h4>
 					<div class="chart-container" style="position: relative; height: 200px; text-align: center; display: flex; align-items: center; justify-content: center;">
-						<div style="color: var(--vscode-descriptionForeground);">${state.emptyText ?? 'No data available'}</div>
+						<div style="color: var(--vscode-descriptionForeground);">No data available</div>
 					</div>
 				</section>
 			`;
 		}
+
+		// Transform ViewModel data to Chart.js format
+		const labels = vmState.data.map(item => item.date);
+		const chartData = vmState.data.map(item => item.requests);
 
 		const canvasId = 'dailyRequestsChart';
 		// Build chart config in TypeScript (use CSS var tokens; they'll be resolved in the webview)
@@ -49,11 +89,11 @@ export class DailyRequestsChartView implements ComponentView<DailyRequestsChartR
 		const chartConfig = {
 			type: 'bar',
 			data: {
-				labels: state.labels,
+				labels: labels,
 				datasets: [
 					{
-						label: state.seriesLabel ?? 'Requests',
-						data: state.data,
+						label: 'Requests',
+						data: chartData,
 						backgroundColor: datasetColorToken,
 						borderColor: datasetColorToken,
 						borderWidth: 1,
@@ -117,7 +157,7 @@ export class DailyRequestsChartView implements ComponentView<DailyRequestsChartR
 
 		return `
 			<section class="daily-requests-chart panel-section">
-				<h4>${state.title ?? 'Daily Requests'}</h4>
+				<h4>Daily Requests</h4>
 				<div class="chart-container panel-section" style="height: 100px; position: relative;">
 					<canvas id="${canvasId}" style="touch-action: manipulation;"></canvas>
 				</div>
@@ -153,5 +193,13 @@ export class DailyRequestsChartView implements ComponentView<DailyRequestsChartR
 				</script>
 			</section>
 		`;
+	}
+
+	/**
+	 * Called when the model state changes - component updates itself
+	 */
+	private onStateChanged(): void {
+		const html = this.render();
+		this.updateView(html);
 	}
 }

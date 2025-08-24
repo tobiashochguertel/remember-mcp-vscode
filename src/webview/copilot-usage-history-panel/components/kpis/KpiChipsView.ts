@@ -1,28 +1,79 @@
-import { ComponentView } from '../shared/ComponentBase';
+import { ComponentBase, ComponentMessage } from '../shared/ComponentBase';
+import { KpiChipsViewModel } from './KpiChipsViewModel';
+import { CopilotUsageHistoryModel } from '../../copilot-usage-history-model';
+import { ILogger } from '../../../../types/logger';
+import * as vscode from 'vscode';
 
 export interface KpiChipsRenderState {
 	chips: Array<{ label: string; value: string; tooltip?: string }>;
 	isLoading: boolean;
 }
 
-export class KpiChipsView implements ComponentView<KpiChipsRenderState, never> {
-	render(state: KpiChipsRenderState): string {
+/**
+ * KPI Chips Component - manages its own state and rendering via PostMessage
+ */
+export class KpiChipsView extends ComponentBase {
+	private viewModel: KpiChipsViewModel;
+
+	constructor(
+		webview: vscode.Webview,
+		private model: CopilotUsageHistoryModel,
+		private logger: ILogger
+	) {
+		super(webview, 'kpi-chips-container');
+		this.viewModel = this.model.kpiChipsViewModel;
+
+		// Subscribe to model changes and update when data changes
+		this.viewModel.onDidChange(() => {
+			this.onStateChanged();
+		});
+
+		// Send initial content immediately
+		this.onStateChanged();
+	}
+
+	/**
+	 * Handle messages relevant to KPI chips
+	 */
+	async handleMessage(_message: ComponentMessage): Promise<boolean> {
+		// KPI chips are read-only, so they don't handle any specific messages
+		// They update automatically when the model changes
+		return false;
+	}
+
+	/**
+	 * Render the KPI chips HTML
+	 */
+	protected render(): string {
+		const vmState = this.viewModel.getState();
+		const state: KpiChipsRenderState = {
+			chips: vmState.chips.map(c => ({ label: c.label, value: c.value, tooltip: c.tooltip })),
+			isLoading: vmState.isLoading
+		};
+
 		if (state.isLoading) {
-			return '<section class="panel-section" aria-label="Key metrics"><div class="summary">Loading metrics...</div></section>';
+			return '<div class="summary">Loading metrics...</div>';
 		}
+
 		const items = state.chips;
 		return `
-				<section class="panel-section" aria-label="Key metrics">
-					<div class="kpi-grid" role="list">
-						${items.map(i => `
-							<div class="kpi-chip" role="listitem"${i.tooltip ? ` title="${escapeHtml(i.tooltip)}"` : ''}>
-								<div class="label">${i.label}</div>
-								<div class="value">${i.value}</div>
-							</div>
-						`).join('')}
+			<div class="kpi-grid" role="list">
+				${items.map(i => `
+					<div class="kpi-chip" role="listitem"${i.tooltip ? ` title="${escapeHtml(i.tooltip)}"` : ''}>
+						<div class="label">${i.label}</div>
+						<div class="value">${i.value}</div>
 					</div>
-				</section>
-			`;
+				`).join('')}
+			</div>
+		`;
+	}
+
+	/**
+	 * Called when the model state changes - component updates itself
+	 */
+	private onStateChanged(): void {
+		const html = this.render();
+		this.updateView(html);
 	}
 }
 

@@ -1,4 +1,7 @@
-import { ComponentView } from '../shared/ComponentBase';
+import * as vscode from 'vscode';
+import { ComponentBase, ComponentMessage } from '../shared/ComponentBase';
+import { ActivityFeedViewModel } from './ActivityFeedViewModel';
+import { ILogger } from '../../../../types/logger';
 
 export interface ActivityItemState {
 	timeISO: string;
@@ -15,8 +18,41 @@ export interface ActivityFeedState {
 	items: ActivityItemState[];
 }
 
-export class ActivityFeedView implements ComponentView<ActivityFeedState, never> {
-	render(state: ActivityFeedState): string {
+export class ActivityFeedView extends ComponentBase {
+	private viewModel: ActivityFeedViewModel;
+
+	constructor(
+		webview: vscode.Webview,
+		private model: any, // Model reference for accessing viewModel
+		private logger: ILogger
+	) {
+		super(webview, 'activity-feed-container');
+		this.viewModel = this.model.activityFeedViewModel;
+
+		// Subscribe to model changes and update when data changes
+		this.viewModel.onDidChange(() => {
+			this.onStateChanged();
+		});
+
+		// Send initial content immediately
+		this.onStateChanged();
+	}
+
+	/**
+	 * Handle messages relevant to activity feed
+	 */
+	async handleMessage(_message: ComponentMessage): Promise<boolean> {
+		// Activity feed is read-only, so they don't handle any specific messages
+		// They update automatically when the model changes
+		return false;
+	}
+
+	/**
+	 * Render the activity feed HTML
+	 */
+	protected render(): string {
+		const state = this.viewModel.getState();
+
 		if (!state.items.length) {
 			return '<section class="activity panel-section"><h4>Activity</h4><div class="empty">No recent activity</div></section>';
 		}
@@ -60,5 +96,13 @@ export class ActivityFeedView implements ComponentView<ActivityFeedState, never>
 				</table>
 			</section>
 		`;
+	}
+
+	/**
+	 * Called when the model state changes - component updates itself
+	 */
+	private onStateChanged(): void {
+		const html = this.render();
+		this.updateView(html);
 	}
 }

@@ -13,6 +13,7 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 
 	private _model: CopilotUsageHistoryModel | null = null;
 	private _view: CopilotUsageHistoryView | null = null;
+	private _webview: vscode.Webview | null = null;
 	private _disposables: vscode.Disposable[] = [];
 
 	constructor(
@@ -36,6 +37,9 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 				vscode.Uri.joinPath(this.extensionUri, 'media')
 			]
 		};
+
+		// Store webview reference for later use
+		this._webview = webviewView.webview;
 
 		try {
 			// Resolve shared services from the container
@@ -83,8 +87,8 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 	 * Handle messages from the webview
 	 */
 	private async handleMessage(message: { type?: string; command?: string; [key: string]: any }): Promise<void> {
-		if (!this._model) {
-			this.logger.warn('Model not available for message handling');
+		if (!this._model || !this._view) {
+			this.logger.warn('Model or view not available for message handling');
 			return;
 		}
 
@@ -92,21 +96,25 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 		this.logger.info(`Received message: ${msgType}`);
 
 		try {
+			// Handle component-rendered messages
+			if (msgType === 'component-rendered' && message.componentId && message.html) {
+				this.sendComponentUpdate(message.componentId, message.html);
+				return;
+			}
+
+			// First try to route to components
+			if (msgType) {
+				const componentMessage = { ...message, type: msgType };
+				await this._view.handleMessage(componentMessage);
+			}
+
+			// Handle panel-level messages that aren't handled by components
 			switch (msgType) {
-				case 'refresh':
-					await this.handleRefresh();
-					break;
-				case 'updateTimeRange':
-					await this.updateFiltersFromMessage({ timeRange: message.timeRange });
-					break;
-				case 'applyFilter':
-					await this.updateFiltersFromMessage(message);
-					break;
 				case 'scanChatSessions':
 					await this.scanChatSessions();
 					break;
 				default:
-					this.logger.warn(`Unknown message type: ${msgType}`);
+					this.logger.debug?.(`Message ${msgType} handled by components or ignored`);
 			}
 		} catch (error) {
 			this.logger.error(`Error handling message ${msgType}:`, error);
@@ -114,63 +122,15 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 		}
 	}
 
-	/**
-	 * Handle refresh request
-	 */
-	private async handleRefresh(): Promise<void> {
-		if (!this._model) {return;}
-
-		try {
-			await this._model.refreshAllData();
-			this.logger.info('Usage history data refreshed successfully');
-		} catch (error) {
-			this.logger.error('Error refreshing data:', error);
-			vscode.window.showErrorMessage('Failed to refresh usage data.');
+	private sendComponentUpdate(componentId: string, html: string): void {
+		if (this._webview) {
+			this._webview.postMessage({
+				type: 'component-update',
+				componentId,
+				html
+			});
 		}
 	}
-
-	/**
-	 * Handle time range update
-	 */
-	private async handleUpdateTimeRange(timeRange: 'today' | '7d' | '30d' | '90d' | 'all'): Promise<void> {
-		if (!this._model) {return;}
-
-		try {
-			if (timeRange === 'all') {
-				// Use max configured window for now; future enhancement could load all stored events directly
-				await this._model.updateTimeRange('90d');
-			} else {
-				await this._model.updateTimeRange(timeRange);
-			}
-			this.logger.info(`Time range updated to ${timeRange}`);
-		} catch (error) {
-			this.logger.error('Error updating time range:', error);
-			vscode.window.showErrorMessage('Failed to update time range.');
-		}
-	}
-
-	/**
-	 * New unified filter update pathway (runtime global filters)
-	 */
-	private async updateFiltersFromMessage(msg: any): Promise<void> {
-		if (!this._model) { return; }
-		const patch: any = {};
-		if (msg.timeRange) { patch.timeRange = msg.timeRange; }
-		if (msg.workspace) { patch.workspace = msg.workspace; }
-		if (msg.agentIds) { patch.agents = msg.agentIds; }
-		if (msg.modelIds) { patch.models = msg.modelIds; }
-		if (Object.keys(patch).length === 0) { return; }
-		try {
-			await this._model.updateFilters(patch);
-			this.logger.debug?.('Applied filter patch', patch);
-		} catch (e) {
-			this.logger.error('Failed to apply filter patch', e);
-			vscode.window.showErrorMessage('Failed to apply filters');
-		}
-	}
-
-
-
 
 	/**
 	 * Public API methods (called from commands)
@@ -289,11 +249,14 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 		this._disposables.forEach(d => d.dispose());
 		this._disposables = [];
 
+		if (this._view) {
+			this._view.dispose();
+			this._view = null;
+		}
+
 		if (this._model) {
 			this._model.dispose();
 			this._model = null;
 		}
-
-		this._view = null;
 	}
 }
