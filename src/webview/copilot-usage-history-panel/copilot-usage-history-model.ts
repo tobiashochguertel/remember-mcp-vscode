@@ -266,8 +266,8 @@ export class CopilotUsageHistoryModel {
 
 // Global filters class (runtime authoritative state) - compatible with AnalyticsFilter
 export class GlobalFilters implements AnalyticsFilter {
-	public timeRange?: TimeRange = '30d';
-	public workspace?: 'current' | 'all' = 'all';
-	public agentIds?: string[] = []; // empty => all
-	public modelIds?: string[] = []; // empty => all
+	public timeRange: TimeRange = '30d';
+	public workspace: 'current' | 'all' = 'all';
+	public agentIds: string[] = []; // empty => all
+	public modelIds: string[] = []; // empty => all
 }

@@ -78,7 +78,7 @@ export class FiltersComponentModel implements IComponentModel {
 
 	private fromGlobalFilters(f: GlobalFilters): FiltersState {
 		return {
-			timeRange: f.timeRange || '30d',
+			timeRange: f.timeRange,
 			workspace: (f.workspace === 'current' ? 'current' : 'all'),
 			agentOptions: [], // TODO: populate when agent/model filter selectors added
 			modelOptions: []
