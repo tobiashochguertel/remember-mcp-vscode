@@ -9,7 +9,6 @@ import { AgentsListView } from './components/agents/AgentsListView';
 import { ModelsListView } from './components/models/ModelsListView';
 import { ActivityFeedView } from './components/activity/ActivityFeedView';
 import { DailyRequestsChartView } from './components/charts/DailyRequestsChartView';
-import { InsightsView } from './components/insights/InsightsView';
 import { IComponent } from './components/shared/ComponentBase';
 import { IComponentModel } from './components/shared/IComponentModel';
 
@@ -60,11 +59,10 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 		try {
 			// Resolve shared services from the container
 			const container = ServiceContainer.getInstance();
-			const unifiedData = container.getUnifiedSessionDataService();
 			const analytics = container.getAnalyticsService();
 
 			// Initialize model first
-			this._model = new CopilotUsageHistoryModel(this.context, unifiedData, analytics, this.logger);
+			this._model = new CopilotUsageHistoryModel(this.context, analytics, this.logger);
 			
 			// Create component models with specific dependencies
 			const filtersComponentModel = new FiltersComponentModel(this._model, this.logger);
@@ -94,8 +92,7 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 				new DailyRequestsChartView(webviewView.webview, dailyRequestsChartComponentModel, this.logger),
 				new AgentsListView(webviewView.webview, agentsListComponentModel, this.logger),
 				new ModelsListView(webviewView.webview, modelsListComponentModel, this.logger),
-				new ActivityFeedView(webviewView.webview, activityFeedComponentModel, this.logger),
-				new InsightsView(webviewView.webview, this._model, this.logger)
+				new ActivityFeedView(webviewView.webview, activityFeedComponentModel, this.logger)
 			];
 			
 			// Create view with injected components

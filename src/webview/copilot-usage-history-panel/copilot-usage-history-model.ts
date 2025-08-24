@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
-import { UnifiedSessionDataService } from '../../services/unified-session-data-service';
-import { AnalyticsService, TimeRange as AnalyticsTimeRange } from '../../services/analytics-service';
+import { AnalyticsService, AnalyticsFilter, TimeRange } from '../../services/analytics-service';
 import { IComponentModel } from './components/shared/IComponentModel';
 import { ILogger } from '../../types/logger';
 
@@ -20,7 +19,6 @@ export class CopilotUsageHistoryModel {
 	// Constructor
 	constructor(
 		private readonly extensionContext: vscode.ExtensionContext,
-		private readonly unifiedService: UnifiedSessionDataService,
 		private readonly analyticsService: AnalyticsService,
 		private readonly logger: ILogger
 	)	{
@@ -67,8 +65,8 @@ export class CopilotUsageHistoryModel {
 		// Update the internal state
 		this._filters = filters;
 		
-		// Persist timeRange setting if it changed
-		await this.updateSettings({ defaultTimeRange: filters.timeRange === 'all' ? '90d' : filters.timeRange });
+		// Persist the entire filter state
+		await this.saveFilters(filters);
 		
 		// Refresh all data
 		await this.refreshAllData();
@@ -91,6 +89,9 @@ export class CopilotUsageHistoryModel {
 	 */
 	private async initializeData(): Promise<void> {
 		try {
+			// Load persisted filters first
+			await this.loadPersistedFilters();
+			
 			// Load initial data
 			await this.refreshAllData();
 		} catch (error) {
@@ -147,11 +148,7 @@ export class CopilotUsageHistoryModel {
 	 * Check if there is any usage data available (driven by AnalyticsService)
 	 */
 	public hasData(): boolean {
-		const gf = this.getFilters();
-		const effective = (gf.timeRange === 'all' ? '90d' : gf.timeRange) as AnalyticsTimeRange;
-		const filter = { timeRange: effective } as const;
-		const kpis = this.analyticsService.getKpis(filter);
-		return (kpis.turns || 0) > 0;
+		return this.analyticsService.hasData();
 	}
 
 	/**
@@ -209,17 +206,41 @@ export class CopilotUsageHistoryModel {
 		});
 	}
 
-	// Settings Persistence
-	private async getSettings(): Promise<{ defaultTimeRange: 'today' | '7d' | '30d' | '90d' }> { // TODO(persistence-v1): Extend to full GlobalFilters snapshot with versioning
-		const key = 'copilot-usage-history-settings';
-		const stored = this.extensionContext.globalState.get<{ defaultTimeRange: 'today' | '7d' | '30d' | '90d' }>(key);
-		return stored || { defaultTimeRange: '30d' };
+	// Filter Persistence
+	/**
+	 * Load persisted filters from storage
+	 */
+	private async loadFilters(): Promise<GlobalFilters> {
+		const key = 'copilot-usage-history-filters';
+		const stored = this.extensionContext.globalState.get<GlobalFilters>(key);
+		return stored || new GlobalFilters();
 	}
 
-	private async updateSettings(update: Partial<{ defaultTimeRange: 'today' | '7d' | '30d' | '90d' }>): Promise<void> { // TODO(persistence-v1): Replace with unified saveFilters() (debounced) once full filter persistence added
-		const key = 'copilot-usage-history-settings';
-		const current = await this.getSettings();
-		await this.extensionContext.globalState.update(key, { ...current, ...update });
+	/**
+	 * Save current filters to storage
+	 */
+	private async saveFilters(filters: GlobalFilters): Promise<void> {
+		const key = 'copilot-usage-history-filters';
+		await this.extensionContext.globalState.update(key, filters);
+		this.logger.debug?.('[Persistence] Saved filters:', filters);
+	}
+
+	/**
+	 * Load persisted filters and apply them to the current filter state
+	 */
+	private async loadPersistedFilters(): Promise<void> {
+		try {
+			const persistedFilters = await this.loadFilters();
+			this.logger.debug?.('[Persistence] Loading persisted filters:', persistedFilters);
+			
+			// Apply all persisted filter properties to current filters
+			this._filters = persistedFilters;
+			
+			this.logger.info('[Persistence] Applied persisted filters:', persistedFilters);
+		} catch (error) {
+			this.logger.error('[Persistence] Failed to load persisted filters:', error);
+			// Continue with defaults if loading fails
+		}
 	}
 
 	// Cleanup
@@ -243,10 +264,10 @@ export class CopilotUsageHistoryModel {
 	}
 }
 
-// Global filters class (runtime authoritative state)
-export class GlobalFilters {
-	public timeRange: 'today' | '7d' | '30d' | '90d' | 'all' = '30d';
-	public workspace: string = 'all'; // 'all' or specific workspace identifier
-	public agents: string[] = []; // empty => all
-	public models: string[] = []; // empty => all
+// Global filters class (runtime authoritative state) - compatible with AnalyticsFilter
+export class GlobalFilters implements AnalyticsFilter {
+	public timeRange?: TimeRange = '30d';
+	public workspace?: 'current' | 'all' = 'all';
+	public agentIds?: string[] = []; // empty => all
+	public modelIds?: string[] = []; // empty => all
 }

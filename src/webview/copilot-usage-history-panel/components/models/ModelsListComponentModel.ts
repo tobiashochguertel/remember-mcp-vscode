@@ -28,12 +28,8 @@ export class ModelsListComponentModel implements IComponentModel {
 		try {
 			this.setLoading(true);
 			
-			// Map 'all' to '90d' temporarily for analytics until backend supports 'all'
-			const effectiveTimeRange = (filters.timeRange === 'all' ? '90d' : filters.timeRange) as Exclude<import('../../../../services/analytics-service').TimeRange, 'all'>;
-			const filter = { timeRange: effectiveTimeRange } as const;
-			
-			// Get models data from analytics service (limit to 50 items)
-			const models = this.analyticsService.getModels(filter, 50);
+			// Pass filters directly - GlobalFilters implements AnalyticsFilter
+			const models = this.analyticsService.getModels(filters, 50);
 			
 			this.patch({ 
 				items: models, 

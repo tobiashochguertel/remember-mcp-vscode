@@ -36,12 +36,8 @@ export class KpiChipsComponentModel implements IComponentModel {
 		try {
 			this.setLoading(true);
 			
-			// Map 'all' to '90d' temporarily for analytics until backend supports 'all'
-			const effectiveTimeRange = (filters.timeRange === 'all' ? '90d' : filters.timeRange) as Exclude<import('../../../../services/analytics-service').TimeRange, 'all'>;
-			const filter = { timeRange: effectiveTimeRange } as const;
-			
-			// Get KPI data from analytics service
-			const kpis = this.analyticsService.getKpis(filter);
+			// Pass filters directly - GlobalFilters implements AnalyticsFilter
+			const kpis = this.analyticsService.getKpis(filters);
 			this.applyKpis(kpis);
 			
 		} catch (error) {

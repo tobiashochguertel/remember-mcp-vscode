@@ -28,12 +28,8 @@ export class AgentsListComponentModel implements IComponentModel {
 		try {
 			this.setLoading(true);
 			
-			// Map 'all' to '90d' temporarily for analytics until backend supports 'all'
-			const effectiveTimeRange = (filters.timeRange === 'all' ? '90d' : filters.timeRange) as Exclude<import('../../../../services/analytics-service').TimeRange, 'all'>;
-			const filter = { timeRange: effectiveTimeRange } as const;
-			
-			// Get agents data from analytics service (limit to 25 items)
-			const agents = this.analyticsService.getAgents(filter, 25);
+			// Pass filters directly - GlobalFilters implements AnalyticsFilter
+			const agents = this.analyticsService.getAgents(filters, 25);
 			
 			this.patch({ 
 				items: agents, 

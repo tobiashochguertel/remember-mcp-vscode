@@ -33,12 +33,8 @@ export class DailyRequestsChartComponentModel implements IComponentModel {
 		try {
 			this.setLoading(true);
 			
-			// Map 'all' to '90d' temporarily for analytics until backend supports 'all'
-			const effectiveTimeRange = (filters.timeRange === 'all' ? '90d' : filters.timeRange) as Exclude<import('../../../../services/analytics-service').TimeRange, 'all'>;
-			const filter = { timeRange: effectiveTimeRange } as const;
-			
-			// Get daily requests data from analytics service
-			const data = this.analyticsService.getDailyRequests(filter);
+			// Pass filters directly - GlobalFilters implements AnalyticsFilter
+			const data = this.analyticsService.getDailyRequests(filters);
 			const isEmpty = data.every(item => item.requests === 0);
 			
 			this.patch({ 

@@ -28,12 +28,8 @@ export class ActivityFeedComponentModel implements IComponentModel {
 		try {
 			this.setLoading(true);
 			
-			// Map 'all' to '90d' temporarily for analytics until backend supports 'all'
-			const effectiveTimeRange = (filters.timeRange === 'all' ? '90d' : filters.timeRange) as Exclude<import('../../../../services/analytics-service').TimeRange, 'all'>;
-			const filter = { timeRange: effectiveTimeRange } as const;
-			
-			// Get activity data from analytics service (limit to 100 items)
-			const items = this.analyticsService.getActivity(filter, 100);
+			// Pass filters directly - GlobalFilters implements AnalyticsFilter
+			const items = this.analyticsService.getActivity(filters, 100);
 			
 			this.patch({ 
 				items, 

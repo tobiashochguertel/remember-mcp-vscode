@@ -574,6 +574,14 @@ export class AnalyticsService {
 		return this.unified.isScanning;
 	}
 
+	/**
+	 * Check if there is any session data available
+	 * More efficient than generating KPIs just to check for data existence
+	 */
+	hasData(): boolean {
+		return this.rawSessions.length > 0;
+	}
+
 	// Wire-up helpers
 	private async initializeRawSessionSource(): Promise<void> {
 		try {

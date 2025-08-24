@@ -62,7 +62,7 @@ export class FiltersComponentModel implements IComponentModel {
 					if (event.patch.workspace) {
 						filters.workspace = event.patch.workspace;
 					}
-					// Note: agentIds/modelIds from UI need to be mapped to agents/models arrays
+					// Note: agentIds/modelIds from UI handled directly via GlobalFilters properties
 					await this.model.updateFilters(filters);
 					break;
 				}
@@ -78,7 +78,7 @@ export class FiltersComponentModel implements IComponentModel {
 
 	private fromGlobalFilters(f: GlobalFilters): FiltersState {
 		return {
-			timeRange: f.timeRange,
+			timeRange: f.timeRange || '30d',
 			workspace: (f.workspace === 'current' ? 'current' : 'all'),
 			agentOptions: [], // TODO: populate when agent/model filter selectors added
 			modelOptions: []
