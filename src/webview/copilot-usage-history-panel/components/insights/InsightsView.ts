@@ -17,7 +17,7 @@ export class InsightsView extends ComponentBase {
 		private model: any,
 		private logger: ILogger
 	) {
-		super(webview, 'insights-container');
+		super('insights-container');
 
 		// Don't send initial content immediately - wait for refreshComponentViews()
 		// this.onStateChanged();
@@ -43,12 +43,5 @@ export class InsightsView extends ComponentBase {
 				</ul>
 			</section>
 		`;
-	}
-
-	private onStateChanged(): void {
-		try {
-			this.logger.trace?.('InsightsView: state changed');
-		} catch {}
-		this.updateView(this.render());
 	}
 }

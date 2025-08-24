@@ -22,16 +22,13 @@ export class ModelsListView extends ComponentBase {
 		private model: any, // Model reference for accessing viewModel
 		private logger: ILogger
 	) {
-		super(webview, 'models-list-container');
+		super('models-list-container');
 		this.viewModel = this.model.modelsListViewModel;
 
-		// Subscribe to model changes and update when data changes
+		// Subscribe to model changes - component will be re-rendered when view calls render()
 		this.viewModel.onDidChange(() => {
-			this.onStateChanged();
+			// Component will be re-rendered when the view calls render()
 		});
-
-		// Don't send initial content immediately - wait for refreshComponentViews()
-		// this.onStateChanged();
 	}
 
 	/**
@@ -76,13 +73,5 @@ export class ModelsListView extends ComponentBase {
 				</table>
 			</section>
 		`;
-	}
-
-	/**
-	 * Called when the model state changes - component updates itself
-	 */
-	private onStateChanged(): void {
-		const html = this.render();
-		this.updateView(html);
 	}
 }

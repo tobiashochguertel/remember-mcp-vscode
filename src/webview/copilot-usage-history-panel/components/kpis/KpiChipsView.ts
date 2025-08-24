@@ -20,16 +20,13 @@ export class KpiChipsView extends ComponentBase {
 		private model: CopilotUsageHistoryModel,
 		private logger: ILogger
 	) {
-		super(webview, 'kpi-chips-container');
+		super('kpi-chips-container');
 		this.viewModel = this.model.kpiChipsViewModel;
 
-		// Subscribe to model changes and update when data changes
+		// Subscribe to model changes - component will be re-rendered when view calls render()
 		this.viewModel.onDidChange(() => {
-			this.onStateChanged();
+			// Component will be re-rendered when the view calls render()
 		});
-
-		// Don't send initial content immediately - wait for refreshComponentViews()
-		// this.onStateChanged();
 	}
 
 	/**
@@ -66,14 +63,6 @@ export class KpiChipsView extends ComponentBase {
 				`).join('')}
 			</div>
 		`;
-	}
-
-	/**
-	 * Called when the model state changes - component updates itself
-	 */
-	private onStateChanged(): void {
-		const html = this.render();
-		this.updateView(html);
 	}
 }
 

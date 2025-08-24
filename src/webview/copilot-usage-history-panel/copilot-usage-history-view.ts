@@ -224,6 +224,12 @@ export class CopilotUsageHistoryView {
 				const action = target.getAttribute('data-action');
 				const component = target.getAttribute('data-component');
 				
+				// Skip click events for select elements to avoid duplicate events
+				// (select elements should only trigger on change events)
+				if (target.tagName === 'SELECT') {
+					return;
+				}
+				
 				if (action && component) {
 					sendMessage('componentMessage', {
 						component: component,
