@@ -163,30 +163,48 @@ export class DailyRequestsChartView extends ComponentBase {
 				</div>
 				<script>
 					(function() {
+						console.log('DailyRequestsChart: Script executing for canvas ${canvasId}');
+						
 						// Build and render this specific chart using the shared helper
 						const boot = () => {
+							console.log('DailyRequestsChart: Boot function called');
 							const canvas = document.getElementById('${canvasId}');
-							if (!canvas) return;
+							if (!canvas) {
+								console.error('DailyRequestsChart: Canvas ${canvasId} not found');
+								return;
+							}
 
 							const config = ${JSON.stringify(chartConfig)};
+							console.log('DailyRequestsChart: Config prepared', config);
 
 							if (window.__chartKit) {
+								console.log('DailyRequestsChart: Using __chartKit to render');
 								window.__chartKit.render(canvas, config);
 							} else {
+								console.warn('DailyRequestsChart: __chartKit not available, waiting...');
 								// Fallback wait until shared script loads
 								const wait = setInterval(() => {
 									if (window.__chartKit) {
 										clearInterval(wait);
+										console.log('DailyRequestsChart: __chartKit now available, rendering');
 										window.__chartKit.render(canvas, config);
 									}
 								}, 50);
+								
+								// Timeout after 5 seconds
+								setTimeout(() => {
+									clearInterval(wait);
+									console.error('DailyRequestsChart: Timeout waiting for __chartKit');
+								}, 5000);
 							}
 						};
 
 						// If Chart.js may not be ready yet, utilize helper's whenChartReady when present
 						if (window.__chartKit && window.__chartKit.whenChartReady) {
+							console.log('DailyRequestsChart: Using whenChartReady');
 							window.__chartKit.whenChartReady(boot);
 						} else {
+							console.log('DailyRequestsChart: Calling boot directly');
 							boot();
 						}
 					})();

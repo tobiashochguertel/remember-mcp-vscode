@@ -291,6 +291,19 @@ export class CopilotUsageHistoryView {
 						const element = document.getElementById(message.componentId);
 						if (element) {
 							element.innerHTML = message.html;
+							
+							// Execute any script tags that were just inserted
+							const scripts = element.querySelectorAll('script');
+							scripts.forEach(script => {
+								const newScript = document.createElement('script');
+								if (script.src) {
+									newScript.src = script.src;
+								} else {
+									newScript.textContent = script.textContent;
+								}
+								// Replace the old script with new executable script
+								script.parentNode.replaceChild(newScript, script);
+							});
 						}
 					}
 				});

@@ -41,27 +41,48 @@ export class WebviewUtils {
 			if (!window.__chartKit) {
 				window.__chartKit = (function() {
 					const instances = (window.__charts = window.__charts || {});
-					let ready = typeof Chart !== 'undefined';
+					let ready = false;
 					const onReadyQueue = [];
 					let uid = 0;
 
-					function whenChartReady(cb) {
+					// Check for Chart.js availability immediately and poll if needed
+					function checkChartReady() {
 						if (typeof Chart !== 'undefined') {
+							console.log('__chartKit: Chart.js is now available');
 							ready = true;
-							cb();
-							return;
-						}
-						onReadyQueue.push(cb);
-						if (!ready) {
-							const timer = setInterval(() => {
-								if (typeof Chart !== 'undefined') {
-									ready = true;
-									clearInterval(timer);
-									while (onReadyQueue.length) {
-										try { onReadyQueue.shift()(); } catch (e) { console.error(e); }
-									}
+							// Process any queued callbacks
+							while (onReadyQueue.length) {
+								try { 
+									onReadyQueue.shift()(); 
+								} catch (e) { 
+									console.error('Chart ready callback error:', e); 
 								}
-							}, 100);
+							}
+							return true;
+						}
+						console.log('__chartKit: Chart.js not yet available');
+						return false;
+					}
+
+					// Initial check
+					if (!checkChartReady()) {
+						// Poll for Chart.js availability
+						const pollTimer = setInterval(() => {
+							if (checkChartReady()) {
+								clearInterval(pollTimer);
+							}
+						}, 50);
+						
+						// Fallback: also listen for script load events
+						document.addEventListener('DOMContentLoaded', checkChartReady);
+						window.addEventListener('load', checkChartReady);
+					}
+
+					function whenChartReady(cb) {
+						if (ready || checkChartReady()) {
+							cb();
+						} else {
+							onReadyQueue.push(cb);
 						}
 					}
 
