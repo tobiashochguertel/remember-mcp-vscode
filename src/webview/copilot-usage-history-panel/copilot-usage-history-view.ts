@@ -312,7 +312,7 @@ export class CopilotUsageHistoryView {
 		<head>
 			<meta charset="UTF-8">
 			<meta name="viewport" content="width=device-width, initial-scale=1.0">
-			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'unsafe-eval' vscode-resource: https://file+.vscode-resource.vscode-cdn.net; font-src 'self' data:;">
+			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'unsafe-eval' vscode-resource:; font-src 'self' data:;">
 			<title>Copilot Usage History</title>
 			${styles}
 			<style>
