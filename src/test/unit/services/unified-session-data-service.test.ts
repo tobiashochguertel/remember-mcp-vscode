@@ -239,14 +239,7 @@ describe('UnifiedSessionDataService', () => {
 		it('should handle scan failures', async () => {
 			mockSessionScanner.scanAllSessions = vi.fn().mockRejectedValue(new Error('Scan failed'));
 
-			try {
-				await service.initialize();
-				// Should not reach here
-				expect(true).toBe(false);
-			} catch (error) {
-				// Expected to fail
-				expect(error).toBeDefined();
-			}
+			await expect(service.initialize()).rejects.toThrow('Scan failed');
 		});
 	});
 

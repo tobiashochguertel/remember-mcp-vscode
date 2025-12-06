@@ -105,13 +105,16 @@ describe('AnalyticsService', () => {
 			};
 
 			// Mock the unified service to return our sample data
-			mockUnifiedService.getRawSessionResults = vi.fn().mockResolvedValue([sampleSession]);
+			const mockGetRawSessionResults = vi.fn().mockResolvedValue([sampleSession]);
+			mockUnifiedService.getRawSessionResults = mockGetRawSessionResults;
 			
 			// Re-initialize with the mocked data
 			analyticsService = new AnalyticsService(mockLogger, mockUnifiedService);
 			
-			// Wait for async initialization
-			await new Promise(resolve => setTimeout(resolve, 100));
+			// Wait for the async initialization to call getRawSessionResults
+			await vi.waitFor(() => {
+				expect(mockGetRawSessionResults).toHaveBeenCalled();
+			}, { timeout: 1000 });
 
 			const kpis = analyticsService.getKpis();
 
@@ -204,11 +207,14 @@ describe('AnalyticsService', () => {
 				},
 			];
 
-			mockUnifiedService.getRawSessionResults = vi.fn().mockResolvedValue(sampleSessions);
+			const mockGetRawSessionResults = vi.fn().mockResolvedValue(sampleSessions);
+			mockUnifiedService.getRawSessionResults = mockGetRawSessionResults;
 			analyticsService = new AnalyticsService(mockLogger, mockUnifiedService);
 			
-			// Wait for async initialization
-			await new Promise(resolve => setTimeout(resolve, 100));
+			// Wait for the async initialization to complete
+			await vi.waitFor(() => {
+				expect(mockGetRawSessionResults).toHaveBeenCalled();
+			}, { timeout: 1000 });
 
 			const agents = analyticsService.getAgents(undefined, 5);
 
@@ -280,11 +286,14 @@ describe('AnalyticsService', () => {
 				},
 			};
 
-			mockUnifiedService.getRawSessionResults = vi.fn().mockResolvedValue([sampleSession]);
+			const mockGetRawSessionResults = vi.fn().mockResolvedValue([sampleSession]);
+			mockUnifiedService.getRawSessionResults = mockGetRawSessionResults;
 			analyticsService = new AnalyticsService(mockLogger, mockUnifiedService);
 			
-			// Wait for async initialization
-			await new Promise(resolve => setTimeout(resolve, 100));
+			// Wait for the async initialization to complete
+			await vi.waitFor(() => {
+				expect(mockGetRawSessionResults).toHaveBeenCalled();
+			}, { timeout: 1000 });
 
 			const models = analyticsService.getModels(undefined, 5);
 
@@ -346,11 +355,14 @@ describe('AnalyticsService', () => {
 				},
 			};
 
-			mockUnifiedService.getRawSessionResults = vi.fn().mockResolvedValue([sampleSession]);
+			const mockGetRawSessionResults = vi.fn().mockResolvedValue([sampleSession]);
+			mockUnifiedService.getRawSessionResults = mockGetRawSessionResults;
 			analyticsService = new AnalyticsService(mockLogger, mockUnifiedService);
 			
-			// Wait for async initialization
-			await new Promise(resolve => setTimeout(resolve, 100));
+			// Wait for the async initialization to complete
+			await vi.waitFor(() => {
+				expect(mockGetRawSessionResults).toHaveBeenCalled();
+			}, { timeout: 1000 });
 
 			const activity = analyticsService.getActivity(undefined, 10);
 
@@ -399,11 +411,14 @@ describe('AnalyticsService', () => {
 				},
 			];
 
-			mockUnifiedService.getRawSessionResults = vi.fn().mockResolvedValue(sampleSessions);
+			const mockGetRawSessionResults = vi.fn().mockResolvedValue(sampleSessions);
+			mockUnifiedService.getRawSessionResults = mockGetRawSessionResults;
 			analyticsService = new AnalyticsService(mockLogger, mockUnifiedService);
 			
-			// Wait for async initialization
-			await new Promise(resolve => setTimeout(resolve, 100));
+			// Wait for the async initialization to complete
+			await vi.waitFor(() => {
+				expect(mockGetRawSessionResults).toHaveBeenCalled();
+			}, { timeout: 1000 });
 
 			const filter: AnalyticsFilter = { timeRange: 'all' };
 			const kpis = analyticsService.getKpis(filter);
