@@ -49,11 +49,11 @@ export class Uri {
 	}
 }
 
-export class EventEmitter<T> {
-	private listeners: Array<(e: T) => any> = [];
+export class EventEmitter<_T> {
+	private listeners: Array<(e: _T) => any> = [];
 
 	get event() {
-		return (listener: (e: T) => any) => {
+		return (listener: (e: _T) => any) => {
 			this.listeners.push(listener);
 			return {
 				dispose: () => {
@@ -66,7 +66,7 @@ export class EventEmitter<T> {
 		};
 	}
 
-	fire(data: T): void {
+	fire(data: _T): void {
 		this.listeners.forEach(listener => listener(data));
 	}
 
@@ -112,7 +112,7 @@ export class WorkspaceConfiguration {
 		return Promise.resolve();
 	}
 
-	inspect<T>(section: string): any {
+	inspect(section: string): any {
 		return {
 			key: section,
 			defaultValue: undefined,
@@ -125,15 +125,15 @@ export namespace workspace {
 	export const workspaceFolders: any[] = [];
 	export const fs: any = {};
 	
-	export function getConfiguration(section?: string): WorkspaceConfiguration {
+	export function getConfiguration(_section?: string): WorkspaceConfiguration {
 		return new WorkspaceConfiguration();
 	}
 
-	export function onDidChangeConfiguration(listener: any): any {
+	export function onDidChangeConfiguration(_listener: any): any {
 		return { dispose: () => {} };
 	}
 
-	export function createFileSystemWatcher(pattern: string): any {
+	export function createFileSystemWatcher(_pattern: string): any {
 		return {
 			onDidCreate: () => ({ dispose: () => {} }),
 			onDidChange: () => ({ dispose: () => {} }),
@@ -144,19 +144,19 @@ export namespace workspace {
 }
 
 export namespace window {
-	export function showInformationMessage(message: string, ...items: any[]): Promise<any> {
+	export function showInformationMessage(_message: string, ..._items: any[]): Promise<any> {
 		return Promise.resolve(undefined);
 	}
 
-	export function showWarningMessage(message: string, ...items: any[]): Promise<any> {
+	export function showWarningMessage(_message: string, ..._items: any[]): Promise<any> {
 		return Promise.resolve(undefined);
 	}
 
-	export function showErrorMessage(message: string, ...items: any[]): Promise<any> {
+	export function showErrorMessage(_message: string, ..._items: any[]): Promise<any> {
 		return Promise.resolve(undefined);
 	}
 
-	export function createOutputChannel(name: string): any {
+	export function createOutputChannel(_name: string): any {
 		return {
 			append: () => {},
 			appendLine: () => {},
@@ -167,7 +167,7 @@ export namespace window {
 		};
 	}
 
-	export function createStatusBarItem(alignment?: any, priority?: number): any {
+	export function createStatusBarItem(_alignment?: any, _priority?: number): any {
 		return {
 			text: '',
 			tooltip: '',
@@ -179,10 +179,10 @@ export namespace window {
 	}
 
 	export function createWebviewPanel(
-		viewType: string,
-		title: string,
-		showOptions: any,
-		options?: any
+		_viewType: string,
+		_title: string,
+		_showOptions: any,
+		_options?: any
 	): any {
 		return {
 			webview: {
@@ -201,11 +201,11 @@ export namespace window {
 }
 
 export namespace commands {
-	export function registerCommand(command: string, callback: (...args: any[]) => any): any {
+	export function registerCommand(_command: string, _callback: (...args: any[]) => any): any {
 		return { dispose: () => {} };
 	}
 
-	export function executeCommand(command: string, ...args: any[]): Promise<any> {
+	export function executeCommand(_command: string, ..._args: any[]): Promise<any> {
 		return Promise.resolve(undefined);
 	}
 }
@@ -221,7 +221,7 @@ export namespace env {
 }
 
 export namespace extensions {
-	export function getExtension(extensionId: string): any {
+	export function getExtension(_extensionId: string): any {
 		return undefined;
 	}
 

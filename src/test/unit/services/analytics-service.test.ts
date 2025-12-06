@@ -26,7 +26,7 @@ describe('AnalyticsService', () => {
 
 		// Create mock unified service
 		mockUnifiedService = {
-			onRawSessionResultsUpdated: vi.fn((callback) => {
+			onRawSessionResultsUpdated: vi.fn((_callback) => {
 				// Store callback for later invocation if needed
 				return;
 			}),
