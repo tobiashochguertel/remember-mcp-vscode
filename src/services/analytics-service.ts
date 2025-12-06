@@ -5,11 +5,11 @@ import { UnifiedSessionDataService } from './unified-session-data-service';
 export type TimeRange = 'today' | '7d' | '30d' | '90d' | 'all';
 
 export interface AnalyticsFilter {
-	timeRange: TimeRange;
-	workspace: 'current' | 'all';
+	timeRange?: TimeRange;
+	workspace?: 'current' | 'all';
 	workspaceId?: string;
-	agentIds: string[];
-	modelIds: string[];
+	agentIds?: string[];
+	modelIds?: string[];
 }
 
 export interface Kpis {

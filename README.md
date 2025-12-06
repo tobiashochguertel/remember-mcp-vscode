@@ -12,6 +12,7 @@
 <!-- MARKETPLACE-EXCLUDE-START -->
 
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/nickeolofsson.remember-mcp-vscode?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=nickeolofsson.remember-mcp-vscode)
+[![CI](https://github.com/tobiashochguertel/remember-mcp-vscode/actions/workflows/ci.yml/badge.svg)](https://github.com/tobiashochguertel/remember-mcp-vscode/actions/workflows/ci.yml)
 
 <!-- MARKETPLACE-EXCLUDE-END -->
 
@@ -141,6 +142,39 @@ npm run compile
 1. Open the project in VS Code
 2. Press `F5` to launch a new Extension Development Host
 3. Test the extension in the new window
+
+### CI/CD Workflow
+
+This repository includes a GitHub Actions workflow that automatically:
+- ✅ Builds and type-checks the extension
+- ✅ Runs linting checks
+- ✅ Packages the extension as VSIX
+- ✅ Performs security audits
+- ✅ Tests on Linux (default) and macOS (manual trigger)
+
+**Automatic Triggers:**
+- Push to `main` or `develop` branches
+- Pull requests to `main` or `develop`
+
+**Manual Trigger with OS Selection:**
+1. Go to the [Actions tab](../../actions)
+2. Select "CI" workflow
+3. Click "Run workflow"
+4. Choose OS: `ubuntu-latest` (default) or `macos-latest`
+5. Click "Run workflow" button
+
+The workflow artifacts (VSIX files) are available for download from the Actions tab for 7 days.
+
+### Quality Checks
+
+Before committing, ensure:
+```bash
+npm run lint        # Check code style
+npm run typecheck   # Verify TypeScript types
+npm run compile     # Build the extension
+```
+
+See [EXTENSION_ANALYSIS.md](EXTENSION_ANALYSIS.md) for detailed analysis and recommendations.
 
 ## Related Projects & Links
 - [mode-manager-mcp](https://github.com/NiclasOlofsson/mode-manager-mcp) – The MCP server this extension registers
