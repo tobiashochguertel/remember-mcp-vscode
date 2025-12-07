@@ -13,20 +13,19 @@ const execAsync = promisify(exec);
 
 // Prerequisite checker for Python and pipx
 export class PrerequisiteChecker {
-	private static cachedResult: { python: boolean; pipx: boolean; pythonVersion?: string; autoInstallAttempted?: boolean } | null = null;
+	private static cachedResult: { python: boolean; pipx: boolean; pythonVersion?: string; autoInstallAttempted?: boolean; pipxChecked: boolean } | null = null;
 
 	/**
 	 * Check prerequisites based on the server command being used
 	 * @param checkPipx Whether to check for pipx availability (only needed if command uses pipx)
 	 */
 	static async checkPrerequisites(checkPipx: boolean = true): Promise<{ python: boolean; pipx: boolean; pythonVersion?: string; autoInstallAttempted?: boolean }> {
-		// If we're not checking pipx and have cached results, return them
-		// But always check when pipx check is requested
-		if (this.cachedResult && !checkPipx) {
+		// Return cached result only if it was computed with the same checkPipx value
+		if (this.cachedResult && this.cachedResult.pipxChecked === checkPipx) {
 			return this.cachedResult;
 		}
 
-		const results = { python: false, pipx: false, pythonVersion: undefined as string | undefined, autoInstallAttempted: false };
+		const results = { python: false, pipx: false, pythonVersion: undefined as string | undefined, autoInstallAttempted: false, pipxChecked: checkPipx };
 
 		// Check Python and get version
 		try {
