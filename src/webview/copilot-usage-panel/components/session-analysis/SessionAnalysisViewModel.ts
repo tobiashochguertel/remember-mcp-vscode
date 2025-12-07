@@ -27,7 +27,7 @@ export type SessionAnalysisState = {
  */
 export class SessionAnalysisViewModel implements vscode.Disposable {
 	private _listeners: Array<() => void> = [];
-	private _state: SessionAnalysisState = { enabled: false, model: 'gpt-5-mini', status: 'disabled' };
+	private _state: SessionAnalysisState = { enabled: false, model: 'gpt-4o-mini', status: 'disabled' };
 	private _sessionResultsCallback: (results: SessionScanResult[]) => void;
 	private _currentWorkspaceId: string | null = null;
 	private _latestSession: SessionScanResult | null = null;
@@ -51,7 +51,7 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 		// Initialize from settings (source of truth)
 		const cfg = vscode.workspace.getConfiguration();
 		const enabled = cfg.get<boolean>(SessionAnalysisViewModel.CONFIG.enabled, false);
-		const model = cfg.get<string>(SessionAnalysisViewModel.CONFIG.model, 'gpt-5-mini');
+		const model = cfg.get<string>(SessionAnalysisViewModel.CONFIG.model, 'gpt-4o-mini');
 		this._state.enabled = enabled;
 		this._state.status = enabled ? 'idle' : 'disabled';
 		this._state.model = model;
@@ -80,7 +80,7 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 				)) { return; }
 				const fresh = vscode.workspace.getConfiguration();
 				const newEnabled = fresh.get<boolean>(SessionAnalysisViewModel.CONFIG.enabled, false);
-				const newModel = fresh.get<string>(SessionAnalysisViewModel.CONFIG.model, 'gpt-5-mini');
+				const newModel = fresh.get<string>(SessionAnalysisViewModel.CONFIG.model, 'gpt-4o-mini');
 				let changed = false;
 				if (newEnabled !== this._state.enabled) {
 					this._state.enabled = newEnabled;
@@ -239,13 +239,13 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 			}
 
 			// Select a Copilot model using the VS Code Language Model API
-			const family = this._state.model || 'gpt-5-mini';
+			const family = this._state.model || 'gpt-4o-mini';
 			let model: vscode.LanguageModelChat | undefined;
 			try {
 				let models = await vscode.lm.selectChatModels({ vendor: 'copilot', family });
 				this.logger.info(`SessionAnalysisVM: Selected models for family "${family}": ${models.map(m => m.id).join(', ')}`);
 				model = models?.[0];
-				// Fallback: if no model found and family ends with -mini, try the base family (e.g., gpt-4o, gpt-5)
+				// Fallback: if no model found and family ends with -mini, try the base family (e.g., gpt-4o)
 				if (!model && /-mini$/.test(family)) {
 					const base = family.replace(/-mini$/, '');
 					models = await vscode.lm.selectChatModels({ vendor: 'copilot', family: base });
@@ -392,7 +392,7 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 			'- 0.5 <= confidence < 0.8: mixed indicators, moderate certainty',
 			'- confidence < 0.5: ambiguous session',
 			'',
-			'GPT-5-mini note: Keep responses short to conserve tokens. Use brief reasons.',
+			'Keep responses short to conserve tokens. Use brief reasons.',
 			'',
 			'Return JSON with: { sessionId, primaryPattern, confidence, reasons }',
 			'Confidence in [0.0, 1.0]. Reasons: 1-3 compact bullets.',

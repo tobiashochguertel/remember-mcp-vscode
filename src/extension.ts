@@ -15,8 +15,14 @@ const execAsync = promisify(exec);
 export class PrerequisiteChecker {
 	private static cachedResult: { python: boolean; pipx: boolean; pythonVersion?: string; autoInstallAttempted?: boolean } | null = null;
 
-	static async checkPrerequisites(): Promise<{ python: boolean; pipx: boolean; pythonVersion?: string; autoInstallAttempted?: boolean }> {
-		if (this.cachedResult) {
+	/**
+	 * Check prerequisites based on the server command being used
+	 * @param checkPipx Whether to check for pipx availability (only needed if command uses pipx)
+	 */
+	static async checkPrerequisites(checkPipx: boolean = true): Promise<{ python: boolean; pipx: boolean; pythonVersion?: string; autoInstallAttempted?: boolean }> {
+		// If we're not checking pipx and have cached results, return them
+		// But always check when pipx check is requested
+		if (this.cachedResult && !checkPipx) {
 			return this.cachedResult;
 		}
 
@@ -37,18 +43,35 @@ export class PrerequisiteChecker {
 			}
 		}
 
-		// Check pipx
-		try {
-			if (results.python) {
+		// Check pipx only if requested (depends on server command)
+		if (checkPipx) {
+			try {
 				await execAsync('pipx --version');
 				results.pipx = true;
+			} catch {
+				// pipx not found
 			}
-		} catch {
-			// pipx not found
+		} else {
+			// If not checking pipx, assume it's not required
+			results.pipx = true;
 		}
 
 		this.cachedResult = results;
 		return results;
+	}
+
+	/**
+	 * Determine if the server command requires pipx
+	 */
+	static commandRequiresPipx(serverCommand: string): boolean {
+		return serverCommand.includes('pipx');
+	}
+
+	/**
+	 * Clear cached prerequisite check results
+	 */
+	static clearCache(): void {
+		this.cachedResult = null;
 	}
 
 	static async installPipx(logger?: ILogger): Promise<boolean> {
@@ -134,10 +157,6 @@ export class PrerequisiteChecker {
 			debug(`pipx installation failed: ${error}`);
 			return false;
 		}
-	}
-
-	static clearCache(): void {
-		this.cachedResult = null;
 	}
 }
 
@@ -369,9 +388,14 @@ export function activate(context: vscode.ExtensionContext) {
 		dispose: () => serviceContainer.dispose()
 	});
 
-	// Check prerequisites on startup
-	PrerequisiteChecker.checkPrerequisites().then(prerequisites => {
-		if (!prerequisites.python || !prerequisites.pipx) {
+	// Check prerequisites on startup based on configured server command
+	const config = vscode.workspace.getConfiguration('remember-mcp');
+	const serverCommand = config.get<string>('server.command', 'pipx run --system-site-packages --spec git+https://github.com/NiclasOlofsson/mode-manager-mcp.git mode-manager-mcp');
+	const needsPipx = PrerequisiteChecker.commandRequiresPipx(serverCommand);
+
+	PrerequisiteChecker.checkPrerequisites(needsPipx).then(prerequisites => {
+		// Only show warnings if prerequisites are actually needed for the configured command
+		if (needsPipx && (!prerequisites.python || !prerequisites.pipx)) {
 			const missing = [];
 			if (!prerequisites.python) {
 				missing.push('Python');
@@ -381,7 +405,7 @@ export function activate(context: vscode.ExtensionContext) {
 			}
             
 			// Show different messages based on whether auto-install is available
-			let message = `Remember MCP requires ${missing.join(' and ')} to be installed.`;
+			let message = `Remember MCP requires ${missing.join(' and ')} to be installed for the configured server command.`;
 			if (prerequisites.python && !prerequisites.pipx && prerequisites.pythonVersion) {
 				const versionMatch = prerequisites.pythonVersion.match(/Python (\d+)\.(\d+)/);
 				if (versionMatch) {
@@ -392,7 +416,7 @@ export function activate(context: vscode.ExtensionContext) {
 					}
 				}
 			}
-			message += ' Check the Server Control panel for installation options.';
+			message += ' Check the Server Control panel for installation options or configure a different server command.';
             
 			vscode.window.showWarningMessage(message, 'Show Panel').then(choice => {
 				if (choice === 'Show Panel') {
@@ -529,7 +553,6 @@ export function activate(context: vscode.ExtensionContext) {
 	);
 
 	// Auto-start MCP server if configured
-	const config = vscode.workspace.getConfiguration('remember-mcp');
 	if (config.get<boolean>('server.autoStart', true)) {
 		setTimeout(async () => {
 			await rememberManager.startServer();

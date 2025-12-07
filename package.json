@@ -164,7 +164,7 @@
         "remember-mcp.server.command": {
           "type": "string",
           "default": "pipx run --system-site-packages --spec git+https://github.com/NiclasOlofsson/mode-manager-mcp.git mode-manager-mcp",
-          "description": "Command to run the MCP server (registered with VS Code MCP system)"
+          "description": "Command to run the MCP server. Can use pipx, uv/uvx, docker, or direct command. Examples: 'uvx mode-manager-mcp', 'docker run ...', 'mode-manager-mcp' (if installed globally)"
         },
         "remember-mcp.sessionAnalysis.enabled": {
           "type": "boolean",
@@ -173,13 +173,8 @@
         },
         "remember-mcp.sessionAnalysis.model": {
           "type": "string",
-          "enum": [
-            "gpt-4o",
-            "gpt-4o-mini",
-            "gpt-4o-reasoning"
-          ],
           "default": "gpt-4o-mini",
-          "description": "Default model to use for session analysis"
+          "description": "Model family to use for session analysis (e.g., 'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'o1-preview'). Available models depend on your GitHub Copilot subscription."
         }
       }
     }

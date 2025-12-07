@@ -23,8 +23,11 @@ export class ServerControlPanel implements vscode.WebviewViewProvider {
 			localResourceRoots: [this.extensionUri]
 		};
 
-		// Check prerequisites on startup
-		this.prerequisites = await PrerequisiteChecker.checkPrerequisites();
+		// Check prerequisites on startup based on server command
+		const config = vscode.workspace.getConfiguration('remember-mcp');
+		const serverCommand = config.get<string>('server.command', 'pipx run --system-site-packages --spec git+https://github.com/NiclasOlofsson/mode-manager-mcp.git mode-manager-mcp');
+		const needsPipx = PrerequisiteChecker.commandRequiresPipx(serverCommand);
+		this.prerequisites = await PrerequisiteChecker.checkPrerequisites(needsPipx);
 		webviewView.webview.html = this.getHtmlForWebview(webviewView.webview);
 
 		webviewView.webview.onDidReceiveMessage(async data => {
@@ -38,11 +41,15 @@ export class ServerControlPanel implements vscode.WebviewViewProvider {
 				case 'restart':
 					this.rememberManager.restartServer();
 					break;
-				case 'recheckPrerequisites':
+				case 'recheckPrerequisites': {
 					PrerequisiteChecker.clearCache();
-					this.prerequisites = await PrerequisiteChecker.checkPrerequisites();
+					const config = vscode.workspace.getConfiguration('remember-mcp');
+					const serverCommand = config.get<string>('server.command', 'pipx run --system-site-packages --spec git+https://github.com/NiclasOlofsson/mode-manager-mcp.git mode-manager-mcp');
+					const needsPipx = PrerequisiteChecker.commandRequiresPipx(serverCommand);
+					this.prerequisites = await PrerequisiteChecker.checkPrerequisites(needsPipx);
 					webviewView.webview.html = this.getHtmlForWebview(webviewView.webview);
 					break;
+				}
 				case 'installPipx':
 					await this.handleInstallPipx(webviewView);
 					break;
@@ -90,21 +97,27 @@ export class ServerControlPanel implements vscode.WebviewViewProvider {
 
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	private getHtmlForWebview(webview: vscode.Webview) {
-		// Show prerequisite warning if Python or pipx are missing
-		if (!this.prerequisites?.python || !this.prerequisites?.pipx) {
-			return this.getPrerequisiteWarningHtml();
+		// Check if pipx is needed based on server command
+		const config = vscode.workspace.getConfiguration('remember-mcp');
+		const serverCommand = config.get<string>('server.command', 'pipx run --system-site-packages --spec git+https://github.com/NiclasOlofsson/mode-manager-mcp.git mode-manager-mcp');
+		const needsPipx = PrerequisiteChecker.commandRequiresPipx(serverCommand);
+
+		// Show prerequisite warning only if required dependencies are missing
+		const missingRequired = (needsPipx && (!this.prerequisites?.python || !this.prerequisites?.pipx));
+		if (missingRequired) {
+			return this.getPrerequisiteWarningHtml(needsPipx);
 		}
 
 		return this.getNormalControlHtml();
 	}
 
-	private getPrerequisiteWarningHtml() {
+	private getPrerequisiteWarningHtml(needsPipx: boolean = true) {
 		const missingPython = !this.prerequisites?.python;
-		const missingPipx = !this.prerequisites?.pipx;
+		const missingPipx = needsPipx && !this.prerequisites?.pipx;
 		const pythonVersion = this.prerequisites?.pythonVersion || '';
         
 		// Check if Python 3.10+ is available for auto-install
-		const canAutoInstallPipx = this.prerequisites?.python && !this.prerequisites?.pipx && !this.prerequisites?.autoInstallAttempted;
+		const canAutoInstallPipx = needsPipx && this.prerequisites?.python && !this.prerequisites?.pipx && !this.prerequisites?.autoInstallAttempted;
 		let pythonMajor = 0, pythonMinor = 0;
 		if (pythonVersion) {
 			const versionMatch = pythonVersion.match(/Python (\d+)\.(\d+)/);
@@ -362,6 +375,24 @@ export class ServerControlPanel implements vscode.WebviewViewProvider {
                 <div class="install-step">
                     <span class="install-step-number">3</span>
                     Restart VS Code
+                </div>
+            </div>
+            ` : ''}
+            
+            ${needsPipx ? `
+            <div class="info" style="margin-top: 16px;">
+                <div class="info-title">
+                    <span class="info-icon">💡</span>
+                    Alternative Options
+                </div>
+                <div class="install-step">
+                    If you prefer not to use pipx, you can configure a different server command in settings:
+                    <ul style="margin: 8px 0 0 20px; padding: 0;">
+                        <li>Use <code>uv tool run</code> or <code>uvx</code></li>
+                        <li>Use Docker: <code>docker run ...</code></li>
+                        <li>Use the command directly if installed globally</li>
+                    </ul>
+                    Configure via: Settings → Remember MCP → Server Command
                 </div>
             </div>
             ` : ''}

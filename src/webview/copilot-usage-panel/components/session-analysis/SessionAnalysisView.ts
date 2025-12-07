@@ -6,7 +6,9 @@ export class SessionAnalysisView {
 			<div class="summary">Status: ${state.status} • Model: ${state.model}</div>
 			<div class="actions">
 				<button id="btnRunOnce">Run once</button>
-				<button id="btnSwitchGTP5">Switch to GTP-5</button>
+			</div>
+			<div class="note" style="font-size: 11px; margin-top: 8px;">
+				To change the model, use Settings → Remember MCP → Session Analysis Model
 			</div>
 			${this.renderResults(state)}
 		</section>`;
@@ -52,8 +54,6 @@ export class SessionAnalysisView {
 			(function(){
 				const runBtn = document.getElementById('btnRunOnce');
 				if (runBtn) runBtn.addEventListener('click', () => sendMessage('runNow'));
-				const switchBtn = document.getElementById('btnSwitchGTP5');
-				if (switchBtn) switchBtn.addEventListener('click', () => sendMessage('setCopilotModel', { model: 'GTP-5' }));
 			})();
 			`;
 	}
