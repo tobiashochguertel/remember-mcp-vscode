@@ -98,19 +98,7 @@ export class CopilotUsagePanel implements vscode.WebviewViewProvider, vscode.Dis
 					vscode.window.showErrorMessage('Failed to set session analysis model.');
 				}
 				break;
-			case 'setCopilotModel':
-				try {
-					const model = typeof message.model === 'string' ? message.model : '';
-					if (!model) { throw new Error('No model specified'); }
-					await vscode.commands.executeCommand('copilot-chat.setModel', model);
-					this.logger.info(`Copilot Chat model set to ${model}`);
-					vscode.window.showInformationMessage(`Copilot Chat model set to ${model}.`);
-				} catch (error) {
-					this.logger.error('Error setting Copilot Chat model:', error);
-					console.error('Error setting Copilot Chat model:', error);
-					vscode.window.showErrorMessage('Failed to set Copilot Chat model.');
-				}
-				break;
+
 			case 'toggleConsent':
 				try {
 					const enabled = this._model.toggleConsent();
