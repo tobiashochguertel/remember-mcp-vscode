@@ -22,6 +22,7 @@ export default [
 			'scripts/**',
 			'.vscode/**',
 			'media/**',
+			'src/schemas/chat-session.model.ts', // Generated file, not manually edited
 		],
 	},
 	// Base configuration for all TypeScript files
