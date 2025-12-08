@@ -222,11 +222,27 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 	// Simulate one-off analysis run (placeholder)
 	async runOnce(): Promise<void> {
 		if (!this._state.enabled) {
-			this.logger.info?.('SessionAnalysisVM: runOnce called while disabled');
-			return;
+			this.logger.info?.('SessionAnalysisVM: runOnce called while disabled - enabling automatically');
+			// Auto-enable if user clicks button while disabled
+			this.setEnabled(true);
 		}
 		this._state.status = 'running';
 		this.emit();
+		
+		// Show progress notification
+		await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: 'Analyzing Copilot session...',
+				cancellable: false
+			},
+			async () => {
+				await this.performAnalysis();
+			}
+		);
+	}
+
+	private async performAnalysis(): Promise<void> {
 		try {
 			// Ensure we have latest session in memory
 			if (!this._latestSession) {
@@ -235,6 +251,9 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 			}
 			if (!this._latestSession) {
 				this.logger.warn('No Copilot session data available to analyze yet.');
+				vscode.window.showInformationMessage('No Copilot session data available to analyze yet. Try using Copilot chat first.');
+				this._state.status = 'idle';
+				this.emit();
 				return;
 			}
 
@@ -257,6 +276,8 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 			}
 			if (!model) {
 				void vscode.window.showErrorMessage(`No Copilot model available for family "${family}". Check your Copilot access or try a different model.`);
+				this._state.status = 'idle';
+				this.emit();
 				return;
 			}
 
@@ -330,6 +351,13 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 
 			// Keep existing lightweight summary behavior in panel
 			this._state.analysisSummary = this.computeMinimalSummary(this._latestSession);
+			
+			// Show success message
+			if (this._state.lastAnalysisResult) {
+				vscode.window.showInformationMessage(`Analysis complete: ${this._state.lastAnalysisResult.primaryPattern} (${Math.round(this._state.lastAnalysisResult.confidence * 100)}% confidence)`);
+			} else {
+				vscode.window.showInformationMessage('Analysis complete. Check the panel for results.');
+			}
 		} catch (err) {
 			const lmErr = err as any;
 			if (lmErr && (lmErr instanceof (vscode as any).LanguageModelError || typeof lmErr?.code === 'string')) {

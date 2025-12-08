@@ -12,6 +12,28 @@ export enum LogLevel {
 }
 
 /**
+ * Parse log level from string (e.g., from configuration)
+ * @param level Log level as string
+ * @returns Corresponding LogLevel enum value
+ */
+export function parseLogLevel(level: string): LogLevel {
+	switch (level.toLowerCase()) {
+		case 'trace':
+			return LogLevel.TRACE;
+		case 'debug':
+			return LogLevel.DEBUG;
+		case 'info':
+			return LogLevel.INFO;
+		case 'warn':
+			return LogLevel.WARN;
+		case 'error':
+			return LogLevel.ERROR;
+		default:
+			return LogLevel.INFO;
+	}
+}
+
+/**
  * Logging interface for dependency injection
  * Allows mocking in tests and different implementations
  */
@@ -25,58 +47,86 @@ export interface ILogger {
 	// Configuration
 	setLogLevel(level: LogLevel): void;
 	getLogLevel(): LogLevel;
+
+	// Sub-logger support (tslog-style)
+	getSubLogger(name: string): ILogger;
 }
 
 /**
  * VS Code LogOutputChannel implementation
  * Uses native VS Code log levels and timestamps
+ * Supports hierarchical sub-loggers with configurable log levels
  */
 export class VSCodeLogger implements ILogger {
 	private hasShownChannel = false;
+	private logLevel: LogLevel = LogLevel.INFO;
+	private readonly parentNames: string[] = [];
+	private readonly loggerName: string | undefined;
     
 	constructor(
 		private readonly outputChannel: vscode.LogOutputChannel,
-		private readonly extensionMode: vscode.ExtensionMode = vscode.ExtensionMode.Production
-	) { }
+		private readonly extensionMode: vscode.ExtensionMode = vscode.ExtensionMode.Production,
+		name?: string,
+		parentNames?: string[]
+	) {
+		this.loggerName = name;
+		this.parentNames = parentNames || [];
+	}
 
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	setLogLevel(level: LogLevel): void {
-		// VS Code LogOutputChannel manages log levels natively via the UI
-		// This method is kept for interface compatibility but doesn't need implementation
+		this.logLevel = level;
 	}
 
 	getLogLevel(): LogLevel {
-		// VS Code LogOutputChannel manages log levels natively
-		// Return INFO as default since we can't query the native level
-		return LogLevel.INFO;
+		return this.logLevel;
+	}
+
+	/**
+	 * Create a sub-logger with hierarchical name (tslog-style)
+	 * @param name Name of the sub-logger
+	 * @returns New logger instance with inherited settings
+	 */
+	getSubLogger(name: string): ILogger {
+		const newParentNames = [...this.parentNames];
+		if (this.loggerName) {
+			newParentNames.push(this.loggerName);
+		}
+		const subLogger = new VSCodeLogger(this.outputChannel, this.extensionMode, name, newParentNames);
+		subLogger.setLogLevel(this.logLevel);
+		return subLogger;
 	}
 
 	trace(message: string, ...args: any[]): void {
-		const formattedMessage = this.formatMessageWithCaller(message, ...args);
+		if (this.logLevel > LogLevel.TRACE) {return;}
+		const formattedMessage = this.formatMessageWithHierarchy(message, ...args);
 		this.outputChannel.trace(formattedMessage);
 		this.autoShowInDevelopment();
 	}
 
 	debug(message: string, ...args: any[]): void {
-		const formattedMessage = this.formatMessageWithCaller(message, ...args);
+		if (this.logLevel > LogLevel.DEBUG) {return;}
+		const formattedMessage = this.formatMessageWithHierarchy(message, ...args);
 		this.outputChannel.debug(formattedMessage);
 		this.autoShowInDevelopment();
 	}
 
 	info(message: string, ...args: any[]): void {
-		const formattedMessage = this.formatMessageWithCaller(message, ...args);
+		if (this.logLevel > LogLevel.INFO) {return;}
+		const formattedMessage = this.formatMessageWithHierarchy(message, ...args);
 		this.outputChannel.info(formattedMessage);
 		this.autoShowInDevelopment();
 	}
 
 	warn(message: string, ...args: any[]): void {
-		const formattedMessage = this.formatMessageWithCaller(message, ...args);
+		if (this.logLevel > LogLevel.WARN) {return;}
+		const formattedMessage = this.formatMessageWithHierarchy(message, ...args);
 		this.outputChannel.warn(formattedMessage);
 		this.autoShowInDevelopment();
 	}
 
 	error(message: string, ...args: any[]): void {
-		const formattedMessage = this.formatMessageWithCaller(message, ...args);
+		if (this.logLevel > LogLevel.ERROR) {return;}
+		const formattedMessage = this.formatMessageWithHierarchy(message, ...args);
 		this.outputChannel.error(formattedMessage);
 		this.autoShowInDevelopment();
 	}
@@ -93,10 +143,22 @@ export class VSCodeLogger implements ILogger {
 		return `${message} ${formattedArgs}`;
 	}
 
-	private formatMessageWithCaller(message: string, ...args: any[]): string {
+	private formatMessageWithHierarchy(message: string, ...args: any[]): string {
 		const className = this.getClassName();
-		const prefix = className ? `[${className}]` : '[Unknown]';
+		const hierarchicalName = this.getHierarchicalName();
+		const prefix = hierarchicalName ? `[${hierarchicalName}]` : (className ? `[${className}]` : '[Unknown]');
 		return this.formatMessage(`${prefix} ${message}`, ...args);
+	}
+
+	private getHierarchicalName(): string {
+		if (!this.loggerName && this.parentNames.length === 0) {
+			return '';
+		}
+		const parts = [...this.parentNames];
+		if (this.loggerName) {
+			parts.push(this.loggerName);
+		}
+		return parts.join(':');
 	}
 
 	private getClassName(): string {

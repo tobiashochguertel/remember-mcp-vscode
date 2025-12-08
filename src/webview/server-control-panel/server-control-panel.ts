@@ -6,6 +6,7 @@ export class ServerControlPanel implements vscode.WebviewViewProvider {
 	public static readonly viewType = 'remember-mcp-panel';
 	private prerequisites: { python: boolean; pipx: boolean; pythonVersion?: string; autoInstallAttempted?: boolean } | null = null;
 	private isInstalling = false;
+	private webviewView?: vscode.WebviewView;
 
 	constructor(
 		private readonly extensionUri: vscode.Uri, 
@@ -18,6 +19,8 @@ export class ServerControlPanel implements vscode.WebviewViewProvider {
 		_context: vscode.WebviewViewResolveContext,
 		_token: vscode.CancellationToken,
 	) {
+		this.webviewView = webviewView;
+		
 		webviewView.webview.options = {
 			enableScripts: true,
 			localResourceRoots: [this.extensionUri]
@@ -34,12 +37,15 @@ export class ServerControlPanel implements vscode.WebviewViewProvider {
 			switch (data.type) {
 				case 'start':
 					await this.rememberManager.startServer();
+					this.refreshView();
 					break;
 				case 'stop':
 					this.rememberManager.stopServer();
+					this.refreshView();
 					break;
 				case 'restart':
-					this.rememberManager.restartServer();
+					await this.rememberManager.restartServer();
+					this.refreshView();
 					break;
 				case 'recheckPrerequisites': {
 					PrerequisiteChecker.clearCache();
@@ -55,6 +61,12 @@ export class ServerControlPanel implements vscode.WebviewViewProvider {
 					break;
 			}
 		});
+	}
+
+	private refreshView(): void {
+		if (this.webviewView) {
+			this.webviewView.webview.html = this.getHtmlForWebview(this.webviewView.webview);
+		}
 	}
 
 	private async handleInstallPipx(webviewView: vscode.WebviewView): Promise<void> {
@@ -488,6 +500,8 @@ export class ServerControlPanel implements vscode.WebviewViewProvider {
 	}
 
 	private getNormalControlHtml() {
+		const isRunning = this.rememberManager.isRunning();
+		
 		return `<!DOCTYPE html>
         <html lang="en">
         <head>
@@ -522,10 +536,33 @@ export class ServerControlPanel implements vscode.WebviewViewProvider {
                     line-height: 1.4;
                 }
                 
-                button {
-                    width: 100%;
+                .status {
+                    font-size: 12px;
+                    font-weight: 600;
+                    margin-bottom: 8px;
                     padding: 4px 8px;
-                    margin: 2px 0;
+                    border-radius: 2px;
+                }
+                
+                .status.running {
+                    color: var(--vscode-terminal-ansiGreen);
+                    background-color: var(--vscode-inputValidation-infoBackground);
+                }
+                
+                .status.stopped {
+                    color: var(--vscode-terminal-ansiYellow);
+                    background-color: var(--vscode-inputValidation-warningBackground);
+                }
+                
+                .button-row {
+                    display: flex;
+                    gap: 4px;
+                    margin: 8px 0;
+                }
+                
+                button {
+                    flex: 1;
+                    padding: 4px 8px;
                     border: none;
                     border-radius: 2px;
                     font-size: 11px;
@@ -535,8 +572,13 @@ export class ServerControlPanel implements vscode.WebviewViewProvider {
                     color: var(--vscode-button-foreground);
                 }
                 
-                button:hover {
+                button:hover:not(:disabled) {
                     background-color: var(--vscode-button-hoverBackground);
+                }
+                
+                button:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
                 }
                 
                 .help {
@@ -552,9 +594,15 @@ export class ServerControlPanel implements vscode.WebviewViewProvider {
                 Registers your mode-manager-mcp server with VS Code's built-in MCP system.
             </div>
             
-            <button onclick="sendMessage('start')">Register Server</button>
-            <button onclick="sendMessage('stop')">Unregister Server</button>
-            <button onclick="sendMessage('restart')">Restart Server</button>
+            <div class="status ${isRunning ? 'running' : 'stopped'}">
+                Status: ${isRunning ? '● Running' : '○ Stopped'}
+            </div>
+            
+            <div class="button-row">
+                <button onclick="sendMessage('start')" ${isRunning ? 'disabled' : ''}>Register</button>
+                <button onclick="sendMessage('stop')" ${!isRunning ? 'disabled' : ''}>Unregister</button>
+                <button onclick="sendMessage('restart')" ${!isRunning ? 'disabled' : ''}>Restart</button>
+            </div>
             
             <div class="help">
                 Once registered, Copilot automatically discovers and uses your memory server.

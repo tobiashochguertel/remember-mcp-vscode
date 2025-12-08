@@ -6,7 +6,7 @@ import { CopilotUsageHistoryPanel } from './webview/copilot-usage-history-panel/
 import { ServerControlPanel } from './webview/server-control-panel/index';
 import { CopilotUsagePanel } from './webview/copilot-usage-panel';
 import { UnifiedSessionDataService } from './services/unified-session-data-service';
-import { VSCodeLogger, ILogger } from './types/logger';
+import { VSCodeLogger, ILogger, parseLogLevel } from './types/logger';
 import { ServiceContainer } from './types/service-container';
 
 const execAsync = promisify(exec);
@@ -371,7 +371,14 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Initialize the service container early - this ensures single instances
 	const logChannel = vscode.window.createOutputChannel('Remember MCP', { log: true });
-	const logger = new VSCodeLogger(logChannel);
+	const logger = new VSCodeLogger(logChannel, context.extensionMode, 'RememberMCP');
+	
+	// Configure logger from settings
+	const config = vscode.workspace.getConfiguration('remember-mcp');
+	const logLevel = config.get<string>('logLevel', 'info');
+	logger.setLogLevel(parseLogLevel(logLevel));
+	logger.info(`Extension starting with log level: ${logLevel}`);
+	
 	const serviceContainer = ServiceContainer.initialize({
 		extensionContext: context,
 		logger,
@@ -382,13 +389,24 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
+	// Watch for configuration changes to update log level dynamically
+	context.subscriptions.push(
+		vscode.workspace.onDidChangeConfiguration(e => {
+			if (e.affectsConfiguration('remember-mcp.logLevel')) {
+				const newConfig = vscode.workspace.getConfiguration('remember-mcp');
+				const newLogLevel = newConfig.get<string>('logLevel', 'info');
+				logger.setLogLevel(parseLogLevel(newLogLevel));
+				logger.info(`Log level changed to: ${newLogLevel}`);
+			}
+		})
+	);
+
 	// Dispose service container when extension is deactivated
 	context.subscriptions.push({
 		dispose: () => serviceContainer.dispose()
 	});
 
 	// Check prerequisites on startup based on configured server command
-	const config = vscode.workspace.getConfiguration('remember-mcp');
 	const serverCommand = config.get<string>('server.command', 'pipx run --system-site-packages --spec git+https://github.com/NiclasOlofsson/mode-manager-mcp.git mode-manager-mcp');
 	const needsPipx = PrerequisiteChecker.commandRequiresPipx(serverCommand);
 

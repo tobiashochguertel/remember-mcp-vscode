@@ -174,7 +174,44 @@
         "remember-mcp.sessionAnalysis.model": {
           "type": "string",
           "default": "gpt-4o-mini",
-          "description": "Model family to use for session analysis (e.g., 'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'o1-preview'). Available models depend on your GitHub Copilot subscription."
+          "enum": [
+            "gpt-4o",
+            "gpt-4o-mini",
+            "gpt-4-turbo",
+            "gpt-4",
+            "o1-preview",
+            "o1-mini",
+            "claude-3.5-sonnet"
+          ],
+          "description": "Model to use for session analysis. Available models depend on your GitHub Copilot subscription.",
+          "enumDescriptions": [
+            "GPT-4o - Latest OpenAI model with improved reasoning",
+            "GPT-4o Mini - Faster, cost-effective variant of GPT-4o",
+            "GPT-4 Turbo - High-performance GPT-4 variant",
+            "GPT-4 - Standard GPT-4 model",
+            "o1 Preview - OpenAI's reasoning model (preview)",
+            "o1 Mini - Smaller o1 reasoning model",
+            "Claude 3.5 Sonnet - Anthropic's Claude model"
+          ]
+        },
+        "remember-mcp.logLevel": {
+          "type": "string",
+          "default": "info",
+          "enum": [
+            "trace",
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ],
+          "description": "Log level for the extension. Changes take effect immediately without restarting VS Code.",
+          "enumDescriptions": [
+            "Trace - Most verbose, includes all debug details and execution traces",
+            "Debug - Verbose logging for debugging purposes",
+            "Info - General informational messages",
+            "Warn - Warning messages only",
+            "Error - Error messages only"
+          ]
         }
       }
     }
