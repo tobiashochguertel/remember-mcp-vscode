@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { Logger } from '../../types/logger';
 
 /**
  * Shared webview utilities for consistent styling and functionality
@@ -10,12 +11,15 @@ export class WebviewUtils {
      * Get the shared CSS styles for VS Code panels
      */
 	public static async getSharedStyles(extensionUri: vscode.Uri): Promise<string> {
+		const log = Logger.getInstance('WebviewUtils');
 		try {
 			const cssPath = path.join(extensionUri.fsPath, 'src', 'webview', 'shared', 'styles', 'panel.css');
+			log.debug(`Loading shared styles from: ${cssPath}`);
 			const cssContent = await fs.readFile(cssPath, 'utf8');
+			log.trace(`Loaded ${cssContent.length} bytes of CSS content`);
 			return `<style>${cssContent}</style>`;
 		} catch (error) {
-			console.warn('Failed to load shared styles, using fallback:', error);
+			log.warn('Failed to load shared styles, using fallback:', error);
 			return '<style>/* Fallback: shared styles not available */</style>';
 		}
 	}

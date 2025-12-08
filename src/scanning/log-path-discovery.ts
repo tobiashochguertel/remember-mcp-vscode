@@ -7,6 +7,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { Logger } from '../types/logger';
 
 export class LogPathDiscovery {
 	/**
@@ -23,23 +24,33 @@ export class LogPathDiscovery {
 	 * Returns absolute paths to log directories that exist
 	 */
 	static getVSCodeLogRootDirectories(): string[] {
+		const log = Logger.getInstance('LogPathDiscovery');
 		const appDataPath = process.env.APPDATA;
+		
 		if (!appDataPath) {
+			log.warn('APPDATA environment variable not set, cannot discover log paths');
 			return [];
 		}
 
+		log.debug(`Searching for VS Code logs in: ${appDataPath}`);
 		const logRoots: string[] = [];
+		
 		for (const relativePath of LogPathDiscovery.VSCODE_LOG_PATHS) {
 			const fullPath = path.join(appDataPath, relativePath);
 			try {
 				// Check if directory exists synchronously for this discovery method
 				if (require('fs').existsSync(fullPath)) {
 					logRoots.push(fullPath);
+					log.info(`Found log directory: ${fullPath}`);
+				} else {
+					log.trace(`Log directory does not exist: ${fullPath}`);
 				}
-			} catch {
-				// Directory doesn't exist or can't be accessed, skip it
+			} catch (error) {
+				log.debug(`Cannot access log directory ${fullPath}:`, error);
 			}
 		}
+		
+		log.info(`Discovered ${logRoots.length} VS Code log root directories`);
 		return logRoots;
 	}
 
@@ -48,15 +59,20 @@ export class LogPathDiscovery {
 	 * This provides comprehensive historical data collection
 	 */
 	static async findAllHistoricalLogPaths(): Promise<{ logPath: string; version: string; session: string }[]> {
+		const log = Logger.getInstance('LogPathDiscovery');
+		log.info('Starting comprehensive historical log path discovery');
+		
 		const logRoots = LogPathDiscovery.getVSCodeLogRootDirectories();
 		const allLogPaths: { logPath: string; version: string; session: string }[] = [];
 
 		for (const logRoot of logRoots) {
 			const versionName = logRoot.includes('Insiders') ? 'VS Code Insiders' : 'VS Code Stable';
+			log.debug(`Scanning ${versionName} at: ${logRoot}`);
 
 			try {
 				// Get all session directories (date-timestamp format like 20250813T110757)
 				const sessionDirs = await fs.readdir(logRoot);
+				log.trace(`Found ${sessionDirs.length} session directories in ${versionName}`);
 				
 				for (const sessionName of sessionDirs) {
 					const sessionPath = path.join(logRoot, sessionName);
@@ -72,6 +88,8 @@ export class LogPathDiscovery {
 						const windowPaths = windowDirs
 							.filter(name => name.startsWith('window'))
 							.map(name => path.join(sessionPath, name, 'exthost'));
+
+						log.trace(`Checking ${windowPaths.length} window paths in session ${sessionName}`);
 
 						for (const exthostPath of windowPaths) {
 							try {
@@ -91,24 +109,26 @@ export class LogPathDiscovery {
 											version: versionName,
 											session: sessionName
 										});
+										log.debug(`Found Copilot log: ${logPath}`);
 									}
 								}
-							} catch {
-								// Could not read exthost directory, skip
+							} catch (error) {
+								log.trace(`Could not read exthost directory ${exthostPath}:`, error);
 								continue;
 							}
 						}
-					} catch {
-						// Could not read session directory, skip
+					} catch (error) {
+						log.trace(`Could not read session directory ${sessionPath}:`, error);
 						continue;
 					}
 				}
-			} catch {
-				// Could not read log root directory, skip
+			} catch (error) {
+				log.warn(`Could not read log root directory ${logRoot}:`, error);
 				continue;
 			}
 		}
-
+		
+		log.info(`Historical log discovery complete: found ${allLogPaths.length} Copilot log files`);
 		return allLogPaths;
 	}
 
