@@ -392,6 +392,7 @@ export class AnalyticsService {
 		const model = turn.modelId || undefined;
 		const latencyMs = turn.result?.timings?.totalElapsed;
 		const firstProgressMs = turn.result?.timings?.firstProgress;
+		// Composite turn identifier: prefer responseId (for completed turns) with requestId fallback (for incomplete/cancelled)
 		const requestId = turn.responseId || turn.requestId;
 		const modelRequests = turn.result?.metadata?.toolCallRounds || [];
 		const allFileReferences = this.extractAllFileReferences(turn);
