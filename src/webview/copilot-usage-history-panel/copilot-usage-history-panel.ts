@@ -222,7 +222,30 @@ export class CopilotUsageHistoryPanel implements vscode.WebviewViewProvider, vsc
 		if (!this._model) { return; }
 
 		this.logger.info('scanChatSessions is not required; analytics uses raw session data and auto-refreshes.');
-		vscode.window.showInformationMessage('Scan chat sessions is not required. Data updates automatically from raw session history.');
+		
+		// Check if user wants to see this notification
+		const config = vscode.workspace.getConfiguration('remember-mcp');
+		const showScanNotification = config.get<boolean>('showScanSessionsNotification', true);
+		
+		// Check if notification has been shown in this session
+		const notificationShownKey = 'scanSessionsNotificationShown';
+		const notificationShown = this.context.workspaceState.get<boolean>(notificationShownKey, false);
+		
+		if (showScanNotification && !notificationShown) {
+			const result = await vscode.window.showInformationMessage(
+				'Scan chat sessions is not required. Data updates automatically from raw session history.',
+				'Don\'t show again',
+				'OK'
+			);
+			
+			if (result === 'Don\'t show again') {
+				await config.update('showScanSessionsNotification', false, vscode.ConfigurationTarget.Global);
+				this.logger.info('User disabled scan sessions notification');
+			}
+			
+			// Mark as shown for this session
+			await this.context.workspaceState.update(notificationShownKey, true);
+		}
 	}
 
 	/**

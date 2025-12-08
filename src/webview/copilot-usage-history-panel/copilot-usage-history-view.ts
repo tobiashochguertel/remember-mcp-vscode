@@ -244,47 +244,8 @@ export class CopilotUsageHistoryView {
 				.empty-state .description {
 					font-size: 13px;
 					color: var(--vscode-descriptionForeground);
-					margin-bottom: 24px;
-					line-height: 1.4;
-				}
-				
-				.cta-button {
-					background-color: var(--vscode-button-background);
-					color: var(--vscode-button-foreground);
-					border: none;
-					border-radius: 2px;
-					padding: 10px 16px;
-					font-size: 13px;
-					font-weight: 500;
-					cursor: pointer;
-					font-family: var(--vscode-font-family);
 					margin-bottom: 16px;
-					width: 200px;
-					transition: background-color 0.2s ease;
-					display: inline-flex;
-					align-items: center;
-					justify-content: center;
-					gap: 8px;
-				}
-				
-				.cta-button:hover {
-					background-color: var(--vscode-button-hoverBackground);
-				}
-				
-				.cta-button:focus {
-					outline: 1px solid var(--vscode-focusBorder);
-					outline-offset: 2px;
-				}
-				
-				.cta-button:disabled {
-					background-color: var(--vscode-button-secondaryBackground);
-					color: var(--vscode-button-secondaryForeground);
-					cursor: not-allowed;
-					opacity: 0.6;
-				}
-				
-				.cta-button:disabled:hover {
-					background-color: var(--vscode-button-secondaryBackground);
+					line-height: 1.4;
 				}
 
 				/* Lightweight spinner that respects VS Code theme tokens */
@@ -325,33 +286,25 @@ export class CopilotUsageHistoryView {
 			<div class="empty-state">
 				<h2>No Copilot Usage Data... Yet!</h2>
 				<div class="description">
-					Track and analyze your entire Copilot usage history! See all your coding sessions, 
-					chat interactions, and productivity patterns. Press the button to get started with 
-					scanning your chat sessions for usage events.
+					Track and analyze your entire Copilot usage history! This panel automatically discovers and 
+					analyzes your Copilot chat sessions in the background. Data will appear here once you've used 
+					Copilot chat in this workspace.
 				</div>
-				
-				<button class="cta-button" id="scanButton" ${this._model.isScanning() ? 'disabled aria-busy="true"' : ''}>
-					${this._model.isScanning() ? '<span class="spinner" aria-hidden="true"></span><span>Scanning...</span>' : 'Scan Chat Sessions'}
-				</button>
+				${this._model.isScanning() ? `
+				<div style="margin: 16px 0;">
+					<span class="spinner" aria-hidden="true"></span>
+					<span style="margin-left: 8px; color: var(--vscode-descriptionForeground);">Scanning for sessions...</span>
+				</div>
+				` : `
+				<div class="secondary-action" style="margin-top: 16px;">
+					<p style="margin: 8px 0;">
+						💡 Tip: Use Copilot chat to generate data, or check if Copilot is enabled in your workspace.
+					</p>
+				</div>
+				`}
 			</div>
 			
 			${WebviewUtils.getSharedScript()}
-			<script>
-				// Add event listener instead of inline onclick
-				document.addEventListener('DOMContentLoaded', function() {
-					const scanButton = document.getElementById('scanButton');
-					if (scanButton) {
-						scanButton.addEventListener('click', function() {
-							if (scanButton.disabled) {
-								console.log('Button is disabled, ignoring click');
-								return;
-							}
-							console.log('Button clicked');
-							sendMessage('scanChatSessions');
-						});
-					}
-				});
-			</script>
 		</body>
 		</html>`;
 	}

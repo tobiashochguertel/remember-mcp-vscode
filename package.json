@@ -212,6 +212,11 @@
             "Warn - Warning messages only",
             "Error - Error messages only"
           ]
+        },
+        "remember-mcp.showScanSessionsNotification": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show notification when 'Scan Chat Sessions' button is clicked. The notification explains that scanning is not required as data updates automatically."
         }
       }
     }
