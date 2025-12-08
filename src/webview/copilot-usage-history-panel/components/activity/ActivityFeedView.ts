@@ -27,7 +27,7 @@ export class ActivityFeedView extends ComponentBase {
 	constructor(
 		private webview: vscode.Webview,
 		componentModel: ActivityFeedComponentModel,
-		private logger: ILogger
+		_logger: ILogger // Keep parameter for compatibility but use inherited logger
 	) {
 		super('activity-feed-container');
 		this.componentModel = componentModel;

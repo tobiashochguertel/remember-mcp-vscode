@@ -1,9 +1,21 @@
+import { Logger } from '../../../../types/logger';
+
 export class SessionAnalysisView {
-	render(state: { enabled: boolean; model: string; status: 'idle' | 'running' | 'disabled'; analysisSummary?: { latestSessionId: string; latestTimestamp: number; totalTurns: number; totalToolCallRounds: number; lastUserPromptPreview?: string; lastResponseChars: number }; lastAnalysisResult?: { primaryPattern: string; confidence: number; reasons?: string[] } }): string {
+	private logger = Logger.getInstance('SessionAnalysisView');
+
+	render(state: { enabled: boolean; model: string; modelValid: boolean; modelValidationMessage?: string; status: 'idle' | 'running' | 'disabled'; analysisSummary?: { latestSessionId: string; latestTimestamp: number; totalTurns: number; totalToolCallRounds: number; lastUserPromptPreview?: string; lastResponseChars: number }; lastAnalysisResult?: { primaryPattern: string; confidence: number; reasons?: string[] } }): string {
+		this.logger.trace(`Rendering session analysis: status=${state.status}, model=${state.model}, modelValid=${state.modelValid}`);
+		
+		const modelIndicator = this.getModelValidationIndicator(state.modelValid);
 		return `
 		<section class="card">
 			<h2>AI assisted analysis (Active session)</h2>
-			<div class="summary">Status: ${state.status} • Model: ${state.model}</div>
+			<div class="summary">
+				Status: ${state.status} • Model: ${this.escapeHtml(state.model)} 
+				<span class="codicon ${modelIndicator.icon}" 
+				      style="color: ${modelIndicator.color}; margin-left: 4px;" 
+				      title="${this.escapeHtml(state.modelValidationMessage || 'Validating...')}"></span>
+			</div>
 			<div class="actions">
 				<button id="btnRunOnce">Run once</button>
 			</div>
@@ -12,6 +24,14 @@ export class SessionAnalysisView {
 			</div>
 			${this.renderResults(state)}
 		</section>`;
+	}
+
+	private getModelValidationIndicator(isValid: boolean): { icon: string; color: string } {
+		if (isValid) {
+			return { icon: 'codicon-check', color: 'var(--vscode-charts-green)' };
+		} else {
+			return { icon: 'codicon-warning', color: 'var(--vscode-charts-orange)' };
+		}
 	}
 
 	private escapeHtml(text: string | null | undefined): string {

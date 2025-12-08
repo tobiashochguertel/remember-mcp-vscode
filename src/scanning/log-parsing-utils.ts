@@ -7,6 +7,7 @@
 
 import * as fs from 'fs/promises';
 import { LogEntry } from './log-types';
+import { Logger } from '../types/logger';
 
 export class LogParsingUtils {
 	// Multi-line pattern to capture 3-line request sequences:
@@ -44,10 +45,15 @@ export class LogParsingUtils {
 	 * Captures 3-line patterns: finish reason, request done, ccreq info
 	 */
 	static parseMultiLineRequests(content: string): LogEntry[] {
+		const log = Logger.getInstance('LogParsingUtils');
+		log.debug(`Parsing multi-line requests from ${content.length} bytes of log content`);
+		
 		const entries: LogEntry[] = [];
+		let matchCount = 0;
 
 		let match;
 		while ((match = LogParsingUtils.MULTILINE_REQUEST_PATTERN.exec(content)) !== null) {
+			matchCount++;
 			const [
 				fullMatch,
 				_timestamp1, finishReason,
@@ -77,12 +83,13 @@ export class LogParsingUtils {
 				};
 
 				entries.push(entry);
+				log.trace(`Parsed log entry: model=${modelName.trim()}, requestId=${requestId.trim()}, responseTime=${responseTime}ms`);
 			} catch (error) {
-				// Log parsing error - skip this entry
-				console.error(`Error parsing multi-line match: ${error}`);
+				log.warn(`Error parsing multi-line match #${matchCount}:`, error);
 			}
 		}
 
+		log.info(`Parsed ${entries.length} log entries from ${matchCount} matches`);
 		return entries;
 	}
 
@@ -90,10 +97,16 @@ export class LogParsingUtils {
 	 * Read the entire content of a file
 	 */
 	static async readFileContent(filePath: string): Promise<string> {
+		const log = Logger.getInstance('LogParsingUtils');
+		log.trace(`Reading file content from: ${filePath}`);
+		
 		try {
 			const buffer = await fs.readFile(filePath);
-			return buffer.toString('utf-8');
+			const content = buffer.toString('utf-8');
+			log.debug(`Read ${content.length} bytes from ${filePath}`);
+			return content;
 		} catch (error) {
+			log.error(`Failed to read file ${filePath}:`, error);
 			throw new Error(`Failed to read file ${filePath}: ${error}`);
 		}
 	}

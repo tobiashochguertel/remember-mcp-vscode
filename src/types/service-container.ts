@@ -6,7 +6,7 @@
 import * as vscode from 'vscode';
 import * as os from 'os';
 import * as path from 'path';
-import { ILogger } from './logger';
+import { ILogger, Logger } from './logger';
 import { UnifiedSessionDataService, SessionDataServiceOptions } from '../services/unified-session-data-service';
 import { AnalyticsService } from '../services/analytics-service';
 import { ChatSessionScanner } from '../scanning/chat-session-scanner';
@@ -15,7 +15,7 @@ import { SESSION_SCAN_CONSTANTS } from './chat-session';
 
 export interface ServiceContainerOptions {
 	extensionContext: vscode.ExtensionContext;
-	logger: ILogger;
+	logger: ILogger; // Kept for backwards compatibility, but will use Logger.getInstance()
 	extensionVersion: string;
 	sessionDataServiceOptions?: SessionDataServiceOptions;
 }
@@ -34,13 +34,22 @@ export class ServiceContainer {
 		private readonly logger: ILogger,
 		private readonly extensionVersion: string,
 		private readonly sessionDataServiceOptions: SessionDataServiceOptions = {}
-	) {}
+	) {
+		const log = Logger.getInstance('ServiceContainer');
+		log.debug('ServiceContainer constructor called');
+		log.trace(`Extension version: ${extensionVersion}`);
+		log.trace('Session data service options:', sessionDataServiceOptions);
+	}
 
 	/**
      * Initialize the service container (should be called once from extension activation)
      */
 	static initialize(options: ServiceContainerOptions): ServiceContainer {
+		const log = Logger.getInstance('ServiceContainer');
+		log.info('Initializing ServiceContainer');
+		
 		if (ServiceContainer.instance) {
+			log.warn('ServiceContainer already initialized, returning existing instance');
 			throw new Error('ServiceContainer is already initialized. Use getInstance() instead.');
 		}
         
@@ -55,6 +64,7 @@ export class ServiceContainer {
 			}
 		);
         
+		log.info('ServiceContainer initialized successfully');
 		return ServiceContainer.instance;
 	}
 
@@ -79,11 +89,15 @@ export class ServiceContainer {
      * Get the unified session data service (creates if not exists)
      */
 	getUnifiedSessionDataService(): UnifiedSessionDataService {
+		const log = Logger.getInstance('ServiceContainer');
+		
 		if (!this._unifiedSessionDataService) {
-			this.logger.info('Creating UnifiedSessionDataService instance');
+			log.info('Creating UnifiedSessionDataService instance');
 			
 			// Create storage paths
 			const storagePaths = this.getVSCodeStoragePaths();
+			log.debug(`Found ${storagePaths.length} VS Code storage paths`);
+			log.trace('Storage paths:', storagePaths);
 			
 			// Create session scanner
 			const sessionScanner = new ChatSessionScanner(
@@ -102,9 +116,12 @@ export class ServiceContainer {
 				this.sessionDataServiceOptions,
 			);
 
+			log.debug('Initializing UnifiedSessionDataService asynchronously');
 			this._unifiedSessionDataService.initialize().catch(err => {
-				this.logger.error(`Unified init failed: ${err}`);
+				log.error(`Unified session data service initialization failed: ${err}`);
 			});
+		} else {
+			log.trace('Returning existing UnifiedSessionDataService instance');
 		}
 		return this._unifiedSessionDataService;
 	}
@@ -113,20 +130,31 @@ export class ServiceContainer {
 	 * Get VS Code storage paths for session scanning
 	 */
 	private getVSCodeStoragePaths(): string[] {
+		const log = Logger.getInstance('ServiceContainer');
 		const homedir = os.homedir();
-		return SESSION_SCAN_CONSTANTS.VSCODE_STORAGE_PATHS.map(relativePath => 
+		log.trace(`Home directory: ${homedir}`);
+		
+		const paths = SESSION_SCAN_CONSTANTS.VSCODE_STORAGE_PATHS.map(relativePath => 
 			path.join(homedir, relativePath)
 		);
+		
+		log.debug(`Resolved ${paths.length} storage paths for session scanning`);
+		return paths;
 	}
 
 	/**
 	 * Get the analytics service (creates if not exists)
 	 */
 	getAnalyticsService(): AnalyticsService {
+		const log = Logger.getInstance('ServiceContainer');
+		
 		if (!this._analyticsService) {
-			this.logger.info('Creating AnalyticsService instance');
+			log.info('Creating AnalyticsService instance');
 			const unified = this.getUnifiedSessionDataService();
 			this._analyticsService = new AnalyticsService(this.logger, unified);
+			log.debug('AnalyticsService created successfully');
+		} else {
+			log.trace('Returning existing AnalyticsService instance');
 		}
 		return this._analyticsService;
 	}
@@ -156,25 +184,35 @@ export class ServiceContainer {
      * Dispose all services and reset the singleton
      */
 	dispose(): void {
-		this.logger.info('Disposing services');
+		const log = Logger.getInstance('ServiceContainer');
+		log.info('Disposing ServiceContainer and all services');
         
 		if (this._unifiedSessionDataService) {
+			log.debug('Disposing UnifiedSessionDataService');
 			this._unifiedSessionDataService.dispose();
 			this._unifiedSessionDataService = undefined;
 		}
-		this._analyticsService = undefined;
+		
+		if (this._analyticsService) {
+			log.debug('Clearing AnalyticsService reference');
+			this._analyticsService = undefined;
+		}
         
 		ServiceContainer.instance = null;
-		this.logger.info('Service container disposed');
+		log.info('ServiceContainer disposed successfully');
 	}
 
 	/**
      * Reset the container (for testing)
      */
 	static reset(): void {
+		const log = Logger.getInstance('ServiceContainer');
+		log.warn('Resetting ServiceContainer (for testing)');
+		
 		if (ServiceContainer.instance) {
 			ServiceContainer.instance.dispose();
 		}
 		ServiceContainer.instance = null;
+		log.debug('ServiceContainer reset complete');
 	}
 }

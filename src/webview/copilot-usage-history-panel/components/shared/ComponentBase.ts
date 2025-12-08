@@ -4,6 +4,7 @@
  */
 
 import * as vscode from 'vscode';
+import { Logger, ILogger } from '../../../../types/logger';
 
 /**
  * Message that can be sent to components from the webview
@@ -46,10 +47,14 @@ export interface IComponent {
  */
 export abstract class ComponentBase implements IComponent {
 	protected _disposables: vscode.Disposable[] = [];
+	protected logger: ILogger;
 
 	constructor(
 		public readonly componentId: string
-	) {}
+	) {
+		this.logger = Logger.getInstance(`Component:${componentId}`);
+		this.logger.debug(`Component ${componentId} created`);
+	}
 
 	/**
 	 * Render the component's HTML directly
@@ -60,11 +65,13 @@ export abstract class ComponentBase implements IComponent {
 	 * Handle messages - components can override this for their specific logic
 	 */
 	async handleMessage(_message: ComponentMessage): Promise<boolean> {
+		this.logger.trace(`Component ${this.componentId} received message: ${_message.type}`);
 		// Default implementation does nothing
 		return false;
 	}
 
 	dispose(): void {
+		this.logger.debug(`Disposing component ${this.componentId} with ${this._disposables.length} disposables`);
 		this._disposables.forEach(d => d.dispose());
 		this._disposables = [];
 	}

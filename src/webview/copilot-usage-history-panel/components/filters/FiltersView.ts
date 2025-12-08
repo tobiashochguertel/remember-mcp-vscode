@@ -26,7 +26,7 @@ export class FiltersView extends ComponentBase {
 	constructor(
 		private webview: vscode.Webview,
 		componentModel: FiltersComponentModel,
-		private logger: ILogger
+		_logger: ILogger // Keep parameter for compatibility but use inherited logger
 	) {
 		super('filters-container');
 		this.componentModel = componentModel;

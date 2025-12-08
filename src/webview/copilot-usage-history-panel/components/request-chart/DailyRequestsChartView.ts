@@ -28,7 +28,7 @@ export class DailyRequestsChartView extends ComponentBase {
 	constructor(
 		private webview: vscode.Webview,
 		componentModel: DailyRequestsChartComponentModel,
-		private logger: ILogger
+		_logger: ILogger // Keep parameter for compatibility but use inherited logger
 	) {
 		super('daily-requests-chart-container');
 		this.componentModel = componentModel;

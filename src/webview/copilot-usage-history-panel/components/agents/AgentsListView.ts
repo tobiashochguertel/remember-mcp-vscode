@@ -22,7 +22,7 @@ export class AgentsListView extends ComponentBase {
 	constructor(
 		private webview: vscode.Webview,
 		componentModel: AgentsListComponentModel,
-		private logger: ILogger
+		_logger: ILogger // Keep parameter for compatibility but use inherited logger
 	) {
 		super('agents-list-container');
 		this.componentModel = componentModel;
