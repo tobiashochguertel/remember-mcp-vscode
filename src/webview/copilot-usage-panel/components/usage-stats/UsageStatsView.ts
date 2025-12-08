@@ -1,10 +1,15 @@
 import { WebviewUtils } from '../../../shared/webview-utils';
 import { UsageStatItem } from './UsageStatsViewModel';
+import { Logger } from '../../../../types/logger';
 
 export type UsageStatsRenderState = { stats: UsageStatItem[]; total: number };
 
 export class UsageStatsView {
+	private logger = Logger.getInstance('UsageStatsView');
+
 	render(state: UsageStatsRenderState): string {
+		this.logger.trace(`Rendering usage stats: ${state.stats.length} items, total ${state.total} requests`);
+		
 		const rows = state.stats.length
 			? state.stats.map(({ model, count, updated }) => `<tr${updated ? ' class=\"flash-row\"' : ''}><td>${WebviewUtils.escapeHtml(model)}</td><td class=\"count\">${count}</td></tr>`).join('')
 			: '<tr><td colspan=\"2\" class=\"no-data\">No usage data available<br/>Start using Copilot to track usage</td></tr>';

@@ -1,5 +1,11 @@
+import { Logger } from '../../../../types/logger';
+
 export class SessionAnalysisView {
+	private logger = Logger.getInstance('SessionAnalysisView');
+
 	render(state: { enabled: boolean; model: string; modelValid: boolean; modelValidationMessage?: string; status: 'idle' | 'running' | 'disabled'; analysisSummary?: { latestSessionId: string; latestTimestamp: number; totalTurns: number; totalToolCallRounds: number; lastUserPromptPreview?: string; lastResponseChars: number }; lastAnalysisResult?: { primaryPattern: string; confidence: number; reasons?: string[] } }): string {
+		this.logger.trace(`Rendering session analysis: status=${state.status}, model=${state.model}, modelValid=${state.modelValid}`);
+		
 		const modelIndicator = this.getModelValidationIndicator(state.modelValid);
 		return `
 		<section class="card">
