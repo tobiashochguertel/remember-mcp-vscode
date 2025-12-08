@@ -53,11 +53,103 @@ export interface ILogger {
 }
 
 /**
+ * Singleton Logger Manager
+ * Manages a single Output Channel and provides logger instances
+ */
+export class Logger {
+	private static instance: Logger | null = null;
+	private outputChannel: vscode.LogOutputChannel | null = null;
+	private rootLogger: VSCodeLogger | null = null;
+	private extensionMode: vscode.ExtensionMode = vscode.ExtensionMode.Production;
+	private currentLogLevel: LogLevel = LogLevel.INFO;
+
+	private constructor() {
+		// Private constructor for singleton
+	}
+
+	/**
+	 * Initialize the logger singleton with VS Code context
+	 * Must be called once during extension activation
+	 */
+	static initialize(extensionMode: vscode.ExtensionMode, logLevel: LogLevel = LogLevel.INFO): void {
+		if (Logger.instance) {
+			throw new Error('Logger already initialized. Use Logger.getInstance() instead.');
+		}
+		Logger.instance = new Logger();
+		Logger.instance.extensionMode = extensionMode;
+		Logger.instance.currentLogLevel = logLevel;
+		Logger.instance.outputChannel = vscode.window.createOutputChannel('Remember MCP', { log: true });
+		Logger.instance.rootLogger = new VSCodeLogger(
+			Logger.instance.outputChannel,
+			extensionMode,
+			undefined,
+			[],
+			logLevel
+		);
+	}
+
+	/**
+	 * Get the singleton logger instance
+	 * Creates a logger with the calling file's name if not already initialized
+	 */
+	static getInstance(name?: string): ILogger {
+		if (!Logger.instance || !Logger.instance.rootLogger) {
+			throw new Error('Logger not initialized. Call Logger.initialize() first during extension activation.');
+		}
+		
+		if (name) {
+			return Logger.instance.rootLogger.getSubLogger(name);
+		}
+		
+		return Logger.instance.rootLogger;
+	}
+
+	/**
+	 * Update the log level for all loggers
+	 */
+	static setLogLevel(level: LogLevel): void {
+		if (!Logger.instance || !Logger.instance.rootLogger) {
+			throw new Error('Logger not initialized. Call Logger.initialize() first.');
+		}
+		Logger.instance.currentLogLevel = level;
+		Logger.instance.rootLogger.setLogLevel(level);
+	}
+
+	/**
+	 * Get the current log level
+	 */
+	static getLogLevel(): LogLevel {
+		if (!Logger.instance) {
+			return LogLevel.INFO;
+		}
+		return Logger.instance.currentLogLevel;
+	}
+
+	/**
+	 * Check if logger is initialized
+	 */
+	static isInitialized(): boolean {
+		return Logger.instance !== null && Logger.instance.rootLogger !== null;
+	}
+
+	/**
+	 * Dispose the logger (for testing or cleanup)
+	 */
+	static dispose(): void {
+		if (Logger.instance?.outputChannel) {
+			Logger.instance.outputChannel.dispose();
+		}
+		Logger.instance = null;
+	}
+}
+
+/**
  * VS Code LogOutputChannel implementation
  * Uses native VS Code log levels and timestamps
  * Supports hierarchical sub-loggers with configurable log levels
+ * Internal class - use Logger.getInstance() to get logger instances
  */
-export class VSCodeLogger implements ILogger {
+class VSCodeLogger implements ILogger {
 	private hasShownChannel = false;
 	private logLevel: LogLevel = LogLevel.INFO;
 	private readonly parentNames: string[] = [];
@@ -66,11 +158,13 @@ export class VSCodeLogger implements ILogger {
 	constructor(
 		private readonly outputChannel: vscode.LogOutputChannel,
 		private readonly extensionMode: vscode.ExtensionMode = vscode.ExtensionMode.Production,
-		name?: string,
-		parentNames?: string[]
+		name: string | undefined,
+		parentNames: string[],
+		logLevel: LogLevel = LogLevel.INFO
 	) {
 		this.loggerName = name;
 		this.parentNames = parentNames || [];
+		this.logLevel = logLevel;
 	}
 
 	setLogLevel(level: LogLevel): void {
@@ -91,8 +185,7 @@ export class VSCodeLogger implements ILogger {
 		if (this.loggerName) {
 			newParentNames.push(this.loggerName);
 		}
-		const subLogger = new VSCodeLogger(this.outputChannel, this.extensionMode, name, newParentNames);
-		subLogger.setLogLevel(this.logLevel);
+		const subLogger = new VSCodeLogger(this.outputChannel, this.extensionMode, name, newParentNames, this.logLevel);
 		return subLogger;
 	}
 

@@ -6,6 +6,8 @@ import { ILogger } from '../../../../types/logger';
 export type SessionAnalysisState = {
 	enabled: boolean;
 	model: string;
+	modelValid: boolean;
+	modelValidationMessage?: string;
 	status: 'idle' | 'running' | 'disabled';
 	analysisSummary?: {
 		latestSessionId: string;
@@ -27,7 +29,7 @@ export type SessionAnalysisState = {
  */
 export class SessionAnalysisViewModel implements vscode.Disposable {
 	private _listeners: Array<() => void> = [];
-	private _state: SessionAnalysisState = { enabled: false, model: 'gpt-4o-mini', status: 'disabled' };
+	private _state: SessionAnalysisState = { enabled: false, model: 'gpt-4o-mini', modelValid: false, status: 'disabled' };
 	private _sessionResultsCallback: (results: SessionScanResult[]) => void;
 	private _currentWorkspaceId: string | null = null;
 	private _latestSession: SessionScanResult | null = null;
@@ -55,6 +57,9 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 		this._state.enabled = enabled;
 		this._state.status = enabled ? 'idle' : 'disabled';
 		this._state.model = model;
+		
+		// Validate model asynchronously
+		this.validateModel(model);
 
 		// Workspace context id (same approach as UsageStatsViewModel)
 		this._currentWorkspaceId = this.extractCurrentWorkspaceId();
@@ -89,11 +94,47 @@ export class SessionAnalysisViewModel implements vscode.Disposable {
 				}
 				if (newModel !== this._state.model) {
 					this._state.model = newModel;
+					this.validateModel(newModel);
 					changed = true;
 				}
 				if (changed) { this.emit(); }
 			})
 		);
+	}
+
+	/**
+	 * Validate if the configured model is available via VS Code Language Model API
+	 */
+	private async validateModel(modelFamily: string): Promise<void> {
+		try {
+			const models = await vscode.lm.selectChatModels({ vendor: 'copilot', family: modelFamily });
+			if (models && models.length > 0) {
+				this._state.modelValid = true;
+				this._state.modelValidationMessage = `Model '${modelFamily}' is available (${models.length} variant${models.length > 1 ? 's' : ''} found)`;
+				this.logger.debug(`Model validation: ${modelFamily} is valid (${models.length} variants)`);
+			} else {
+				// Try base family if it ends with -mini
+				if (/-mini$/.test(modelFamily)) {
+					const baseFamily = modelFamily.replace(/-mini$/, '');
+					const baseModels = await vscode.lm.selectChatModels({ vendor: 'copilot', family: baseFamily });
+					if (baseModels && baseModels.length > 0) {
+						this._state.modelValid = true;
+						this._state.modelValidationMessage = `Model '${modelFamily}' not found, but base model '${baseFamily}' is available`;
+						this.logger.warn(`Model validation: ${modelFamily} not found, falling back to ${baseFamily}`);
+						this.emit();
+						return;
+					}
+				}
+				this._state.modelValid = false;
+				this._state.modelValidationMessage = `Model '${modelFamily}' is not available through GitHub Copilot. Check your Copilot subscription or try: gpt-4o, gpt-4o-mini, gpt-4-turbo, o1-preview, o1-mini, claude-3.5-sonnet`;
+				this.logger.warn(`Model validation: ${modelFamily} is not available`);
+			}
+		} catch (error) {
+			this._state.modelValid = false;
+			this._state.modelValidationMessage = `Failed to validate model: ${error}`;
+			this.logger.error(`Model validation error for ${modelFamily}:`, error);
+		}
+		this.emit();
 	}
 
 	private extractCurrentWorkspaceId(): string | null {

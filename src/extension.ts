@@ -6,7 +6,7 @@ import { CopilotUsageHistoryPanel } from './webview/copilot-usage-history-panel/
 import { ServerControlPanel } from './webview/server-control-panel/index';
 import { CopilotUsagePanel } from './webview/copilot-usage-panel';
 import { UnifiedSessionDataService } from './services/unified-session-data-service';
-import { VSCodeLogger, ILogger, parseLogLevel } from './types/logger';
+import { Logger, ILogger, parseLogLevel } from './types/logger';
 import { ServiceContainer } from './types/service-container';
 
 const execAsync = promisify(exec);
@@ -364,14 +364,12 @@ export class RememberMcpManager {
 
 // Extension activation function
 export function activate(context: vscode.ExtensionContext) {
-	// Initialize the service container early - this ensures single instances
-	const logChannel = vscode.window.createOutputChannel('Remember MCP', { log: true });
-	const logger = new VSCodeLogger(logChannel, context.extensionMode, 'Extension');
-	
-	// Configure logger from settings
+	// Initialize singleton logger first
 	const config = vscode.workspace.getConfiguration('remember-mcp');
 	const logLevel = config.get<string>('logLevel', 'info');
-	logger.setLogLevel(parseLogLevel(logLevel));
+	Logger.initialize(context.extensionMode, parseLogLevel(logLevel));
+	
+	const logger = Logger.getInstance('Extension');
 	logger.info('Remember MCP extension activating...');
 	logger.debug(`Extension mode: ${vscode.ExtensionMode[context.extensionMode]}`);
 	logger.debug(`Extension version: ${context.extension.packageJSON.version}`);
@@ -393,15 +391,18 @@ export function activate(context: vscode.ExtensionContext) {
 			if (e.affectsConfiguration('remember-mcp.logLevel')) {
 				const newConfig = vscode.workspace.getConfiguration('remember-mcp');
 				const newLogLevel = newConfig.get<string>('logLevel', 'info');
-				logger.setLogLevel(parseLogLevel(newLogLevel));
+				Logger.setLogLevel(parseLogLevel(newLogLevel));
 				logger.info(`Log level changed to: ${newLogLevel}`);
 			}
 		})
 	);
 
-	// Dispose service container when extension is deactivated
+	// Dispose service container and logger when extension is deactivated
 	context.subscriptions.push({
-		dispose: () => serviceContainer.dispose()
+		dispose: () => {
+			serviceContainer.dispose();
+			Logger.dispose();
+		}
 	});
 
 	// Check prerequisites on startup based on configured server command
