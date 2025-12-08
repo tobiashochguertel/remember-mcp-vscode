@@ -244,7 +244,7 @@ export class AnalyticsService {
 				file: r.filePath,
 				latencyMs: r.latencyMs,
 				sessionId: r.sessionId,
-				requestId: r.turnId
+				requestId: r.requestId || r.turnId // Support both field names for backward compatibility
 			}));
 		return items;
 	}
@@ -392,7 +392,7 @@ export class AnalyticsService {
 		const model = turn.modelId || undefined;
 		const latencyMs = turn.result?.timings?.totalElapsed;
 		const firstProgressMs = turn.result?.timings?.firstProgress;
-		const turnId = turn.responseId || turn.turnId;
+		const turnId = turn.responseId || turn.requestId;
 		const modelRequests = turn.result?.metadata?.toolCallRounds || [];
 		const allFileReferences = this.extractAllFileReferences(turn);
 		const filePath = this.extractFirstFilePath(turn); // Keep for backward compatibility

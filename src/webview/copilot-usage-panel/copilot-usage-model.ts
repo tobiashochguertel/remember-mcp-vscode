@@ -172,14 +172,14 @@ export class CopilotUsageModel {
 						const currentCount = modelUsage.get(modelLabel) || 0;
 						modelUsage.set(modelLabel, currentCount + 1);
 						
-						this._logger.trace(`Request ${request.turnId}, Round ${index}: model=${modelLabel}, roundId=${round.id}`);
+						this._logger.trace(`Request ${request.requestId || request.turnId}, Round ${index}: model=${modelLabel}, roundId=${round.id}`);
 					});
 				} else {
 					// Fallback: if no toolCallRounds, count as 1 request (for older session format compatibility)
 					const currentCount = modelUsage.get(modelLabel) || 0;
 					modelUsage.set(modelLabel, currentCount + 1);
 					
-					this._logger.trace(`Request ${request.turnId}: model=${modelLabel}, no toolCallRounds (fallback count=1)`);
+					this._logger.trace(`Request ${request.requestId || request.turnId}: model=${modelLabel}, no toolCallRounds (fallback count=1)`);
 				}
 			});
 		});
