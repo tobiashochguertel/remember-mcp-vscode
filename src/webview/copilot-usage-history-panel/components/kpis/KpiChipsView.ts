@@ -17,7 +17,7 @@ export class KpiChipsView extends ComponentBase {
 	constructor(
 		private webview: vscode.Webview,
 		componentModel: KpiChipsComponentModel,
-		private logger: ILogger
+		_logger: ILogger // Keep parameter for compatibility but use inherited logger
 	) {
 		super('kpi-chips-container');
 		this.componentModel = componentModel;

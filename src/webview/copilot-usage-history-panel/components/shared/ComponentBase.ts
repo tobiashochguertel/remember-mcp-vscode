@@ -4,7 +4,7 @@
  */
 
 import * as vscode from 'vscode';
-import { Logger } from '../../../../types/logger';
+import { Logger, ILogger } from '../../../../types/logger';
 
 /**
  * Message that can be sent to components from the webview
@@ -47,11 +47,12 @@ export interface IComponent {
  */
 export abstract class ComponentBase implements IComponent {
 	protected _disposables: vscode.Disposable[] = [];
-	protected logger = Logger.getInstance(`Component:${this.componentId}`);
+	protected logger: ILogger;
 
 	constructor(
 		public readonly componentId: string
 	) {
+		this.logger = Logger.getInstance(`Component:${componentId}`);
 		this.logger.debug(`Component ${componentId} created`);
 	}
 

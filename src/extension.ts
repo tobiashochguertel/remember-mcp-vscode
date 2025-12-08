@@ -447,7 +447,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Create Remember MCP manager with context for unified data service and shared output channel
 	logger.info('Creating RememberMcpManager');
-	const rememberManager = new RememberMcpManager(context, logChannel, logger.getSubLogger('Manager'));
+	const rememberManager = new RememberMcpManager(context, Logger.getOutputChannel(), logger.getSubLogger('Manager'));
 
 	// Register Copilot Usage panel provider
 	logger.info('Registering Copilot Usage panel provider');
@@ -561,7 +561,6 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Add all disposables
 	context.subscriptions.push(
-		logChannel, // Dispose shared log channel
 		rememberManager,
 		startCommand,
 		stopCommand,

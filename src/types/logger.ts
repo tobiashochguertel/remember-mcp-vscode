@@ -133,6 +133,16 @@ export class Logger {
 	}
 
 	/**
+	 * Get the output channel (for showing the log panel)
+	 */
+	static getOutputChannel(): vscode.LogOutputChannel {
+		if (!Logger.instance?.outputChannel) {
+			throw new Error('Logger not initialized. Call Logger.initialize() first.');
+		}
+		return Logger.instance.outputChannel;
+	}
+
+	/**
 	 * Dispose the logger (for testing or cleanup)
 	 */
 	static dispose(): void {
