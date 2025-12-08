@@ -1,0 +1,1319 @@
+{
+    "$schema": "http://json-schema.org/draft-06/schema#",
+    "$ref": "#/definitions/ChatSessionSchema",
+    "definitions": {
+        "ChatSessionSchema": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "version": {
+                    "type": "integer"
+                },
+                "requesterUsername": {
+                    "type": "string"
+                },
+                "requesterAvatarIconUri": {
+                    "$ref": "#/definitions/RequesterAvatarIconURI"
+                },
+                "responderUsername": {
+                    "type": "string"
+                },
+                "responderAvatarIconUri": {
+                    "$ref": "#/definitions/ResponderAvatarIconURI"
+                },
+                "initialLocation": {
+                    "type": "string"
+                },
+                "requests": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/Request"
+                    }
+                },
+                "sessionId": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "creationDate": {
+                    "type": "integer"
+                },
+                "isImported": {
+                    "type": "boolean"
+                },
+                "lastMessageDate": {
+                    "type": "integer"
+                }
+            },
+            "required": [
+                "creationDate",
+                "initialLocation",
+                "isImported",
+                "lastMessageDate",
+                "requesterAvatarIconUri",
+                "requesterUsername",
+                "requests",
+                "responderAvatarIconUri",
+                "responderUsername",
+                "sessionId",
+                "version"
+            ],
+            "title": "ChatSessionSchema"
+        },
+        "RequesterAvatarIconURI": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "$mid": {
+                    "type": "integer"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "scheme": {
+                    "type": "string"
+                },
+                "authority": {
+                    "type": "string"
+                },
+                "query": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "$mid",
+                "authority",
+                "path",
+                "query",
+                "scheme"
+            ],
+            "title": "RequesterAvatarIconURI"
+        },
+        "Request": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "requestId": {
+                    "type": "string"
+                },
+                "message": {
+                    "$ref": "#/definitions/RequestMessage"
+                },
+                "variableData": {
+                    "$ref": "#/definitions/VariableData"
+                },
+                "response": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/Response"
+                    }
+                },
+                "responseId": {
+                    "type": "string"
+                },
+                "result": {
+                    "$ref": "#/definitions/Result"
+                },
+                "followups": {
+                    "type": "array",
+                    "items": {}
+                },
+                "isCanceled": {
+                    "type": "boolean"
+                },
+                "agent": {
+                    "$ref": "#/definitions/Agent"
+                },
+                "contentReferences": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ContentReference"
+                    }
+                },
+                "codeCitations": {
+                    "type": "array",
+                    "items": {}
+                },
+                "timestamp": {
+                    "type": "integer"
+                }
+            },
+            "required": [
+                "agent",
+                "codeCitations",
+                "contentReferences",
+                "followups",
+                "isCanceled",
+                "message",
+                "requestId",
+                "response",
+                "responseId",
+                "result",
+                "timestamp",
+                "variableData"
+            ],
+            "title": "Request"
+        },
+        "Agent": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "extensionId": {
+                    "$ref": "#/definitions/ExtensionID"
+                },
+                "publisherDisplayName": {
+                    "type": "string"
+                },
+                "extensionPublisherId": {
+                    "type": "string"
+                },
+                "extensionDisplayName": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "when": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/AgentMetadata"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "fullName": {
+                    "type": "string"
+                },
+                "isDefault": {
+                    "type": "boolean"
+                },
+                "locations": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "slashCommands": {
+                    "type": "array",
+                    "items": {}
+                },
+                "disambiguation": {
+                    "type": "array",
+                    "items": {}
+                }
+            },
+            "required": [
+                "description",
+                "disambiguation",
+                "extensionDisplayName",
+                "extensionId",
+                "extensionPublisherId",
+                "fullName",
+                "id",
+                "isDefault",
+                "locations",
+                "metadata",
+                "name",
+                "publisherDisplayName",
+                "slashCommands",
+                "when"
+            ],
+            "title": "Agent"
+        },
+        "ExtensionID": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "value": {
+                    "type": "string"
+                },
+                "_lower": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "_lower",
+                "value"
+            ],
+            "title": "ExtensionID"
+        },
+        "AgentMetadata": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "themeIcon": {
+                    "$ref": "#/definitions/ResponderAvatarIconURI"
+                },
+                "hasFollowups": {
+                    "type": "boolean"
+                },
+                "supportIssueReporting": {
+                    "type": "boolean"
+                },
+                "welcomeMessageContent": {
+                    "$ref": "#/definitions/WelcomeMessageContent"
+                }
+            },
+            "required": [
+                "hasFollowups",
+                "supportIssueReporting",
+                "themeIcon",
+                "welcomeMessageContent"
+            ],
+            "title": "AgentMetadata"
+        },
+        "ResponderAvatarIconURI": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "id": {
+                    "$ref": "#/definitions/ID"
+                }
+            },
+            "required": [
+                "id"
+            ],
+            "title": "ResponderAvatarIconURI"
+        },
+        "WelcomeMessageContent": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "icon": {
+                    "$ref": "#/definitions/ResponderAvatarIconURI"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "message": {
+                    "$ref": "#/definitions/PastTenseMessageClass"
+                }
+            },
+            "required": [
+                "icon",
+                "message",
+                "title"
+            ],
+            "title": "WelcomeMessageContent"
+        },
+        "Uris": {
+            "type": "object",
+            "additionalProperties": false,
+            "title": "Uris"
+        },
+        "ContentReference": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "kind": {
+                    "type": "string"
+                },
+                "reference": {
+                    "$ref": "#/definitions/Reference"
+                }
+            },
+            "required": [
+                "kind",
+                "reference"
+            ],
+            "title": "ContentReference"
+        },
+        "Reference": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "$mid": {
+                    "type": "integer"
+                },
+                "fsPath": {
+                    "type": "string"
+                },
+                "external": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "scheme": {
+                    "$ref": "#/definitions/Scheme"
+                },
+                "authority": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "$mid",
+                "external",
+                "fsPath",
+                "path",
+                "scheme"
+            ],
+            "title": "Reference"
+        },
+        "RequestMessage": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "parts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/Part"
+                    }
+                },
+                "text": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "parts",
+                "text"
+            ],
+            "title": "RequestMessage"
+        },
+        "Part": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "range": {
+                    "$ref": "#/definitions/PurpleRange"
+                },
+                "editorRange": {
+                    "$ref": "#/definitions/EditorRangeClass"
+                },
+                "text": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "editorRange",
+                "kind",
+                "range",
+                "text"
+            ],
+            "title": "Part"
+        },
+        "EditorRangeClass": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "startLineNumber": {
+                    "type": "integer"
+                },
+                "startColumn": {
+                    "type": "integer"
+                },
+                "endLineNumber": {
+                    "type": "integer"
+                },
+                "endColumn": {
+                    "type": "integer"
+                }
+            },
+            "required": [
+                "endColumn",
+                "endLineNumber",
+                "startColumn",
+                "startLineNumber"
+            ],
+            "title": "EditorRangeClass"
+        },
+        "PurpleRange": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "start": {
+                    "type": "integer"
+                },
+                "endExclusive": {
+                    "type": "integer"
+                }
+            },
+            "required": [
+                "endExclusive",
+                "start"
+            ],
+            "title": "PurpleRange"
+        },
+        "Response": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "kind": {
+                    "$ref": "#/definitions/Kind"
+                },
+                "invocationMessage": {
+                    "$ref": "#/definitions/InvocationMessageUnion"
+                },
+                "pastTenseMessage": {
+                    "$ref": "#/definitions/PastTenseMessageClass"
+                },
+                "isConfirmed": {
+                    "type": "boolean"
+                },
+                "isComplete": {
+                    "type": "boolean"
+                },
+                "resultDetails": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ResultDetail"
+                    }
+                },
+                "toolCallId": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "value": {
+                    "type": "string"
+                },
+                "supportThemeIcons": {
+                    "type": "boolean"
+                },
+                "supportHtml": {
+                    "type": "boolean"
+                },
+                "baseUri": {
+                    "$ref": "#/definitions/BaseURI"
+                },
+                "inlineReference": {
+                    "$ref": "#/definitions/InlineReference"
+                },
+                "presentation": {
+                    "$ref": "#/definitions/Presentation"
+                },
+                "id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "isTrusted": {
+                    "type": "boolean"
+                },
+                "uri": {
+                    "$ref": "#/definitions/Reference"
+                },
+                "isEdit": {
+                    "type": "boolean"
+                },
+                "edits": {
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/definitions/Edit"
+                        }
+                    }
+                },
+                "done": {
+                    "type": "boolean"
+                },
+                "resolveId": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "uris": {
+                    "$ref": "#/definitions/Uris"
+                }
+            },
+            "required": [],
+            "title": "Response"
+        },
+        "BaseURI": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "$mid": {
+                    "type": "integer"
+                },
+                "path": {
+                    "$ref": "#/definitions/Path"
+                },
+                "scheme": {
+                    "$ref": "#/definitions/Scheme"
+                }
+            },
+            "required": [
+                "$mid",
+                "path",
+                "scheme"
+            ],
+            "title": "BaseURI"
+        },
+        "Edit": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "text": {
+                    "type": "string"
+                },
+                "range": {
+                    "$ref": "#/definitions/EditorRangeClass"
+                }
+            },
+            "required": [
+                "range",
+                "text"
+            ],
+            "title": "Edit"
+        },
+        "InlineReference": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "$mid": {
+                    "type": "integer"
+                },
+                "fsPath": {
+                    "type": "string"
+                },
+                "external": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "scheme": {
+                    "$ref": "#/definitions/Scheme"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "integer"
+                },
+                "containerName": {
+                    "type": "string"
+                },
+                "location": {
+                    "$ref": "#/definitions/Location"
+                }
+            },
+            "required": [],
+            "title": "InlineReference"
+        },
+        "Location": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "range": {
+                    "$ref": "#/definitions/EditorRangeClass"
+                },
+                "uri": {
+                    "$ref": "#/definitions/Reference"
+                }
+            },
+            "required": [
+                "range",
+                "uri"
+            ],
+            "title": "Location"
+        },
+        "PastTenseMessageClass": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "value": {
+                    "type": "string"
+                },
+                "supportThemeIcons": {
+                    "type": "boolean"
+                },
+                "supportHtml": {
+                    "type": "boolean"
+                },
+                "uris": {
+                    "$ref": "#/definitions/Uris"
+                }
+            },
+            "required": [
+                "supportHtml",
+                "supportThemeIcons",
+                "uris",
+                "value"
+            ],
+            "title": "PastTenseMessageClass"
+        },
+        "ResultDetail": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "uri": {
+                    "$ref": "#/definitions/Reference"
+                },
+                "range": {
+                    "$ref": "#/definitions/EditorRangeClass"
+                },
+                "$mid": {
+                    "type": "integer"
+                },
+                "fsPath": {
+                    "type": "string"
+                },
+                "external": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "scheme": {
+                    "$ref": "#/definitions/Scheme"
+                }
+            },
+            "required": [],
+            "title": "ResultDetail"
+        },
+        "Result": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "timings": {
+                    "$ref": "#/definitions/Timings"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/ResultMetadata"
+                }
+            },
+            "required": [
+                "metadata",
+                "timings"
+            ],
+            "title": "Result"
+        },
+        "ResultMetadata": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "edits": {
+                    "$ref": "#/definitions/Edits"
+                },
+                "codeBlocks": {
+                    "type": "array",
+                    "items": {}
+                },
+                "messages": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/MessageElement"
+                    }
+                },
+                "toolCallRounds": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ToolCallRound"
+                    }
+                },
+                "toolCallResults": {
+                    "$ref": "#/definitions/ToolCallResults"
+                },
+                "modelMessageId": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "responseId": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "sessionId": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "agentId": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "agentId",
+                "codeBlocks",
+                "edits",
+                "messages",
+                "modelMessageId",
+                "responseId",
+                "sessionId",
+                "toolCallResults",
+                "toolCallRounds"
+            ],
+            "title": "ResultMetadata"
+        },
+        "Edits": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "workingSet": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/WorkingSet"
+                    }
+                },
+                "promptInstructions": {
+                    "type": "array",
+                    "items": {}
+                },
+                "request": {
+                    "type": "string"
+                },
+                "response": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "promptInstructions",
+                "request",
+                "response",
+                "workingSet"
+            ],
+            "title": "Edits"
+        },
+        "WorkingSet": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "uri": {
+                    "$ref": "#/definitions/Reference"
+                },
+                "text": {
+                    "type": "string"
+                },
+                "languageId": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                },
+                "state": {
+                    "type": "integer"
+                }
+            },
+            "required": [
+                "languageId",
+                "state",
+                "text",
+                "uri",
+                "version"
+            ],
+            "title": "WorkingSet"
+        },
+        "MessageElement": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "role": {
+                    "$ref": "#/definitions/Role"
+                },
+                "content": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "content",
+                "role"
+            ],
+            "title": "MessageElement"
+        },
+        "ToolCallResults": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "tooluse_Vcthmn5gSnGKZhCASjzvYw__vscode-1746562994642": {
+                    "$ref": "#/definitions/TooluseFaCT2PBoSDiIG5ZUcld8FgVscode1746562994644_Class"
+                },
+                "tooluse_Fp7opi2wSByPfVool-NMcg__vscode-1746562994643": {
+                    "$ref": "#/definitions/TooluseFaCT2PBoSDiIG5ZUcld8FgVscode1746562994644_Class"
+                },
+                "tooluse_FaCT2pBoSDiIG5ZUcld8fg__vscode-1746562994644": {
+                    "$ref": "#/definitions/TooluseFaCT2PBoSDiIG5ZUcld8FgVscode1746562994644_Class"
+                },
+                "tooluse_xSJxr1idRzem1jYkiqGspQ__vscode-1746562994645": {
+                    "$ref": "#/definitions/TooluseFaCT2PBoSDiIG5ZUcld8FgVscode1746562994644_Class"
+                },
+                "tooluse_ky1sOBevTrCGH_SaAwvABg__vscode-1746562994646": {
+                    "$ref": "#/definitions/TooluseFaCT2PBoSDiIG5ZUcld8FgVscode1746562994644_Class"
+                },
+                "tooluse_hAC9SHFjS8yuk6k_XPsyyg__vscode-1746562994647": {
+                    "$ref": "#/definitions/TooluseC5ZxpkZ4TCa9Or9QsLhEpQVscode1746562994652_Class"
+                },
+                "tooluse_V-uZJ7-_Rfe1yzn1QpoxzQ__vscode-1746562994648": {
+                    "$ref": "#/definitions/TooluseC5ZxpkZ4TCa9Or9QsLhEpQVscode1746562994652_Class"
+                },
+                "tooluse_CAZnwNmbSKSfSLu6FbaKeQ__vscode-1746562994649": {
+                    "$ref": "#/definitions/TooluseC5ZxpkZ4TCa9Or9QsLhEpQVscode1746562994652_Class"
+                },
+                "tooluse_C8DvW3_xR9q9z_6pYO5ouA__vscode-1746562994650": {
+                    "$ref": "#/definitions/TooluseC5ZxpkZ4TCa9Or9QsLhEpQVscode1746562994652_Class"
+                },
+                "tooluse_tejKnuJqTlK2a3dXDCR3qg__vscode-1746562994651": {
+                    "$ref": "#/definitions/TooluseC5ZxpkZ4TCa9Or9QsLhEpQVscode1746562994652_Class"
+                },
+                "tooluse_C5zxpkZ4TCa9or9QsLhEpQ__vscode-1746562994652": {
+                    "$ref": "#/definitions/TooluseC5ZxpkZ4TCa9Or9QsLhEpQVscode1746562994652_Class"
+                }
+            },
+            "required": [],
+            "title": "ToolCallResults"
+        },
+        "TooluseC5ZxpkZ4TCa9Or9QsLhEpQVscode1746562994652_Class": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "$mid": {
+                    "type": "integer"
+                },
+                "content": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/TooluseC5ZxpkZ4TCa9Or9QsLhEpQVscode1746562994652_Content"
+                    }
+                }
+            },
+            "required": [
+                "$mid",
+                "content"
+            ],
+            "title": "TooluseC5ZxpkZ4TCa9Or9QsLhEpQVscode1746562994652_Class"
+        },
+        "TooluseC5ZxpkZ4TCa9Or9QsLhEpQVscode1746562994652_Content": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "$mid": {
+                    "type": "integer"
+                },
+                "value": {
+                    "$ref": "#/definitions/Value"
+                }
+            },
+            "required": [
+                "$mid",
+                "value"
+            ],
+            "title": "TooluseC5ZxpkZ4TCa9Or9QsLhEpQVscode1746562994652_Content"
+        },
+        "Value": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "node": {
+                    "$ref": "#/definitions/Node"
+                }
+            },
+            "required": [
+                "node"
+            ],
+            "title": "Value"
+        },
+        "Node": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "type": {
+                    "type": "integer"
+                },
+                "ctor": {
+                    "type": "integer"
+                },
+                "children": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/NodeChild"
+                    }
+                },
+                "references": {
+                    "type": "array",
+                    "items": {}
+                }
+            },
+            "required": [
+                "children",
+                "ctor",
+                "references",
+                "type"
+            ],
+            "title": "Node"
+        },
+        "NodeChild": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "type": {
+                    "type": "integer"
+                },
+                "ctor": {
+                    "type": "integer"
+                },
+                "children": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/PurpleChild"
+                    }
+                },
+                "references": {
+                    "type": "array",
+                    "items": {}
+                }
+            },
+            "required": [
+                "children",
+                "ctor",
+                "references",
+                "type"
+            ],
+            "title": "NodeChild"
+        },
+        "PurpleChild": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "type": {
+                    "type": "integer"
+                },
+                "ctor": {
+                    "type": "integer"
+                },
+                "children": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/FluffyChild"
+                    }
+                },
+                "references": {
+                    "type": "array",
+                    "items": {}
+                },
+                "priority": {
+                    "type": "integer"
+                },
+                "text": {
+                    "type": "string"
+                },
+                "lineBreakBefore": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "type"
+            ],
+            "title": "PurpleChild"
+        },
+        "FluffyChild": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "type": {
+                    "type": "integer"
+                },
+                "priority": {
+                    "type": "integer"
+                },
+                "text": {
+                    "type": "string"
+                },
+                "lineBreakBefore": {
+                    "type": "boolean"
+                },
+                "ctor": {
+                    "type": "integer"
+                },
+                "children": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/TentacledChild"
+                    }
+                },
+                "references": {
+                    "type": "array",
+                    "items": {}
+                }
+            },
+            "required": [
+                "type"
+            ],
+            "title": "FluffyChild"
+        },
+        "TentacledChild": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "type": {
+                    "type": "integer"
+                },
+                "ctor": {
+                    "type": "integer"
+                },
+                "children": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/StickyChild"
+                    }
+                },
+                "references": {
+                    "type": "array",
+                    "items": {}
+                }
+            },
+            "required": [
+                "children",
+                "ctor",
+                "references",
+                "type"
+            ],
+            "title": "TentacledChild"
+        },
+        "StickyChild": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "type": {
+                    "type": "integer"
+                },
+                "priority": {
+                    "type": "integer"
+                },
+                "text": {
+                    "type": "string"
+                },
+                "references": {
+                    "type": "array",
+                    "items": {}
+                },
+                "lineBreakBefore": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "lineBreakBefore",
+                "priority",
+                "references",
+                "text",
+                "type"
+            ],
+            "title": "StickyChild"
+        },
+        "TooluseFaCT2PBoSDiIG5ZUcld8FgVscode1746562994644_Class": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "$mid": {
+                    "type": "integer"
+                },
+                "content": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/TooluseFaCT2PBoSDiIG5ZUcld8FgVscode1746562994644_Content"
+                    }
+                }
+            },
+            "required": [
+                "$mid",
+                "content"
+            ],
+            "title": "TooluseFaCT2PBoSDiIG5ZUcld8FgVscode1746562994644_Class"
+        },
+        "TooluseFaCT2PBoSDiIG5ZUcld8FgVscode1746562994644_Content": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "$mid": {
+                    "type": "integer"
+                },
+                "value": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "$mid",
+                "value"
+            ],
+            "title": "TooluseFaCT2PBoSDiIG5ZUcld8FgVscode1746562994644_Content"
+        },
+        "ToolCallRound": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "toolCalls": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ToolCall"
+                    }
+                },
+                "toolInputRetry": {
+                    "type": "integer"
+                },
+                "response": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "response",
+                "toolCalls",
+                "toolInputRetry"
+            ],
+            "title": "ToolCallRound"
+        },
+        "ToolCall": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "name": {
+                    "$ref": "#/definitions/Name"
+                },
+                "arguments": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "arguments",
+                "id",
+                "name"
+            ],
+            "title": "ToolCall"
+        },
+        "Timings": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "firstProgress": {
+                    "type": "integer"
+                },
+                "totalElapsed": {
+                    "type": "integer"
+                }
+            },
+            "required": [
+                "firstProgress",
+                "totalElapsed"
+            ],
+            "title": "Timings"
+        },
+        "VariableData": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "variables": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/Variable"
+                    }
+                }
+            },
+            "required": [
+                "variables"
+            ],
+            "title": "VariableData"
+        },
+        "Variable": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "value": {
+                    "$ref": "#/definitions/ResultDetail"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "isFile": {
+                    "type": "boolean"
+                },
+                "isDirectory": {
+                    "type": "boolean"
+                },
+                "isOmitted": {
+                    "type": "boolean"
+                },
+                "modelDescription": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "id",
+                "isFile",
+                "name",
+                "value"
+            ],
+            "title": "Variable"
+        },
+        "InvocationMessageUnion": {
+            "anyOf": [
+                {
+                    "$ref": "#/definitions/PastTenseMessageClass"
+                },
+                {
+                    "$ref": "#/definitions/InvocationMessageEnum"
+                }
+            ],
+            "title": "InvocationMessageUnion"
+        },
+        "ID": {
+            "type": "string",
+            "enum": [
+                "copilot",
+                "copilot-large"
+            ],
+            "title": "ID"
+        },
+        "Scheme": {
+            "type": "string",
+            "enum": [
+                "file",
+                "vscode"
+            ],
+            "title": "Scheme"
+        },
+        "Path": {
+            "type": "string",
+            "enum": [
+                "/Users/tobiashochgurtel/work-dev/better-touch-tool/windsurf-ide/"
+            ],
+            "title": "Path"
+        },
+        "InvocationMessageEnum": {
+            "type": "string",
+            "enum": [
+                "Using \"Edit File\""
+            ],
+            "title": "InvocationMessageEnum"
+        },
+        "Kind": {
+            "type": "string",
+            "enum": [
+                "toolInvocationSerialized",
+                "inlineReference",
+                "undoStop",
+                "codeblockUri",
+                "textEditGroup"
+            ],
+            "title": "Kind"
+        },
+        "Presentation": {
+            "type": "string",
+            "enum": [
+                "hidden"
+            ],
+            "title": "Presentation"
+        },
+        "Role": {
+            "type": "string",
+            "enum": [
+                "user",
+                "assistant"
+            ],
+            "title": "Role"
+        },
+        "Name": {
+            "type": "string",
+            "enum": [
+                "insert_edit_into_file"
+            ],
+            "title": "Name"
+        }
+    }
+}
