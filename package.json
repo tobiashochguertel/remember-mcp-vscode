@@ -224,7 +224,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "bump-version": "npm version patch",
-    "package:marketplace": "npm run bump-version && npm run generate-marketplace-readme && vsce package --readme-path README_marketplace.md",
+    "package:marketplace": "npm run bump-version && npm run generate-marketplace-readme && vsce package",
     "publish:marketplace": "npm run package:marketplace && vsce publish --readme-path README_marketplace.md",
     "copy-libs": "npx cpy node_modules/chart.js/dist/chart.umd.js media/libs/",
     "gen:ai-test-data": "tsx ai-test-data/generate_llm_classification_datasets.ts"
