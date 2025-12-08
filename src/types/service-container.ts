@@ -4,14 +4,12 @@
  */
 
 import * as vscode from 'vscode';
-import * as os from 'os';
-import * as path from 'path';
 import { ILogger, Logger } from './logger';
 import { UnifiedSessionDataService, SessionDataServiceOptions } from '../services/unified-session-data-service';
 import { AnalyticsService } from '../services/analytics-service';
 import { ChatSessionScanner } from '../scanning/chat-session-scanner';
 import { GlobalLogScanner } from '../scanning/global-log-scanner';
-import { SESSION_SCAN_CONSTANTS } from './chat-session';
+import { getVSCodeStoragePaths } from '../util/vscode-paths';
 
 export interface ServiceContainerOptions {
 	extensionContext: vscode.ExtensionContext;
@@ -128,17 +126,14 @@ export class ServiceContainer {
 
 	/**
 	 * Get VS Code storage paths for session scanning
+	 * Uses OS-aware path resolution to support Windows, macOS, and Linux
 	 */
 	private getVSCodeStoragePaths(): string[] {
 		const log = Logger.getInstance('ServiceContainer');
-		const homedir = os.homedir();
-		log.trace(`Home directory: ${homedir}`);
+		const paths = getVSCodeStoragePaths();
 		
-		const paths = SESSION_SCAN_CONSTANTS.VSCODE_STORAGE_PATHS.map(relativePath => 
-			path.join(homedir, relativePath)
-		);
-		
-		log.debug(`Resolved ${paths.length} storage paths for session scanning`);
+		log.debug(`Resolved ${paths.length} OS-specific storage paths for session scanning`);
+		log.trace('Storage paths:', paths);
 		return paths;
 	}
 

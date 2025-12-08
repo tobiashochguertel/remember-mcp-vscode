@@ -179,12 +179,6 @@ export interface SessionMetadata {
 
 // Constants for session scanning
 export const SESSION_SCAN_CONSTANTS = {
-	// VS Code storage paths
-	VSCODE_STORAGE_PATHS: [
-		'AppData/Roaming/Code/User/workspaceStorage',
-		'AppData/Roaming/Code - Insiders/User/workspaceStorage'
-	],
-    
 	// Chat session directory name
 	CHAT_SESSIONS_DIR: 'chatSessions',
     
