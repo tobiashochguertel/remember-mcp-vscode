@@ -52,7 +52,7 @@ export interface RequestMetadata {
 }
 
 export interface CopilotChatTurn {
-	turnId: string;
+	requestId: string;  // Field name in actual JSON files (not "turnId")
 	responseId: string;
 	timestamp: number; // Unix timestamp
 	modelId?: string; // Optional - not all requests have a modelId

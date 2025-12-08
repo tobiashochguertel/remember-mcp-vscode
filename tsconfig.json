@@ -22,6 +22,7 @@
 		"temp_summary/**/*",
 		"**/*.test.ts",
 		"out/**/*",
-		"dist/**/*"
+		"dist/**/*",
+		"src/schemas/chat-session.model.ts"
 	]
 }
