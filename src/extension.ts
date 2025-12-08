@@ -364,20 +364,18 @@ export class RememberMcpManager {
 
 // Extension activation function
 export function activate(context: vscode.ExtensionContext) {
-	console.log('Remember MCP extension is now active!');
-    
-	// Show immediate debug message
-	vscode.window.showInformationMessage('Remember MCP Extension Activated!');
-
 	// Initialize the service container early - this ensures single instances
 	const logChannel = vscode.window.createOutputChannel('Remember MCP', { log: true });
-	const logger = new VSCodeLogger(logChannel, context.extensionMode, 'RememberMCP');
+	const logger = new VSCodeLogger(logChannel, context.extensionMode, 'Extension');
 	
 	// Configure logger from settings
 	const config = vscode.workspace.getConfiguration('remember-mcp');
 	const logLevel = config.get<string>('logLevel', 'info');
 	logger.setLogLevel(parseLogLevel(logLevel));
-	logger.info(`Extension starting with log level: ${logLevel}`);
+	logger.info('Remember MCP extension activating...');
+	logger.debug(`Extension mode: ${vscode.ExtensionMode[context.extensionMode]}`);
+	logger.debug(`Extension version: ${context.extension.packageJSON.version}`);
+	logger.info(`Log level configured: ${logLevel}`);
 	
 	const serviceContainer = ServiceContainer.initialize({
 		extensionContext: context,
@@ -409,8 +407,11 @@ export function activate(context: vscode.ExtensionContext) {
 	// Check prerequisites on startup based on configured server command
 	const serverCommand = config.get<string>('server.command', 'pipx run --system-site-packages --spec git+https://github.com/NiclasOlofsson/mode-manager-mcp.git mode-manager-mcp');
 	const needsPipx = PrerequisiteChecker.commandRequiresPipx(serverCommand);
+	logger.debug(`Server command: ${serverCommand}`);
+	logger.trace(`Pipx required: ${needsPipx}`);
 
 	PrerequisiteChecker.checkPrerequisites(needsPipx).then(prerequisites => {
+		logger.debug(`Prerequisites check completed: Python=${prerequisites.python}, Pipx=${prerequisites.pipx}`);
 		// Only show warnings if prerequisites are actually needed for the configured command
 		if (needsPipx && (!prerequisites.python || !prerequisites.pipx)) {
 			const missing = [];
@@ -444,22 +445,26 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	// Create Remember MCP manager with context for unified data service and shared output channel
-	const rememberManager = new RememberMcpManager(context, logChannel, logger);
+	logger.info('Creating RememberMcpManager');
+	const rememberManager = new RememberMcpManager(context, logChannel, logger.getSubLogger('Manager'));
 
 	// Register Copilot Usage panel provider
+	logger.info('Registering Copilot Usage panel provider');
 	const usagePanelProvider = new CopilotUsagePanel(context.extensionUri, context);
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(CopilotUsagePanel.viewType, usagePanelProvider)
 	);
 
 	// Register enhanced Copilot Usage History panel provider
-	const usageHistoryPanelProvider = new CopilotUsageHistoryPanel(context.extensionUri, context, logger);
+	logger.info('Registering Copilot Usage History panel provider');
+	const usageHistoryPanelProvider = new CopilotUsageHistoryPanel(context.extensionUri, context, logger.getSubLogger('UsageHistory'));
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(CopilotUsageHistoryPanel.viewType, usageHistoryPanelProvider)
 	);
 
 	// Register webview panel provider
-	const panelProvider = new ServerControlPanel(context.extensionUri, rememberManager, logger);
+	logger.info('Registering Server Control panel provider');
+	const panelProvider = new ServerControlPanel(context.extensionUri, rememberManager, logger.getSubLogger('ServerControl'));
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(ServerControlPanel.viewType, panelProvider)
 	);
@@ -570,8 +575,12 @@ export function activate(context: vscode.ExtensionContext) {
 	);
 
 	// Auto-start MCP server if configured
-	if (config.get<boolean>('server.autoStart', true)) {
+	const autoStart = config.get<boolean>('server.autoStart', true);
+	logger.debug(`Auto-start MCP server: ${autoStart}`);
+	if (autoStart) {
+		logger.info('Scheduling MCP server auto-start in 2 seconds');
 		setTimeout(async () => {
+			logger.trace('Auto-start timer triggered');
 			await rememberManager.startServer();
 		}, 2000); // Delay to ensure VS Code is fully loaded
 	}
@@ -579,10 +588,15 @@ export function activate(context: vscode.ExtensionContext) {
 	// Dispose usage history panel on deactivate
 	context.subscriptions.push({
 		dispose: () => {
+			logger.info('Extension deactivating - disposing resources');
 			// Dispose usage history panel
 			usageHistoryPanelProvider.dispose();
 		}
 	});
+	
+	logger.info('Extension activation completed successfully');
 }
 
-export function deactivate() {}
+export function deactivate() {
+	console.log('Remember MCP extension deactivating');
+}
