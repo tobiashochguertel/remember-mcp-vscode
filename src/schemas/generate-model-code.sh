@@ -124,7 +124,7 @@ generate_model() {
 
   cd "${SCHEMAS_DIR}" || exit 1
 
-  if ${QUICKTYPE_CMD} -s schema "${CONFIG[schema_file]}" --lang ts -o "${CONFIG[output_file]}"; then
+  if eval "${QUICKTYPE_CMD}" -s schema "${CONFIG[schema_file]}" --lang ts -o "${CONFIG[output_file]}"; then
     print_colored green "✓ Model generated successfully"
   else
     print_colored red "Error: Failed to generate model"
