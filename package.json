@@ -6,7 +6,7 @@
   "description": "A VS Code extension that registers MCP servers with VS Code's built-in MCP system",
   "repository": {
     "type": "git",
-    "url": "https://github.com/NiclasOlofsson/remember-mcp-vscode"
+    "url": "https://github.com/tobiashochguertel/remember-mcp-vscode"
   },
   "categories": [
     "Other"
