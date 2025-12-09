@@ -63,9 +63,16 @@ EOF
 
 # Function to check if required tools are available
 check_requirements() {
-  if ! command -v quicktype &>/dev/null; then
-    print_colored red "Error: quicktype is not installed or not in PATH"
+  # Check if quicktype is available globally or via npx
+  if command -v quicktype &>/dev/null; then
+    QUICKTYPE_CMD="quicktype"
+  elif command -v npx &>/dev/null; then
+    print_colored yellow "Using npx to run quicktype (not installed globally)"
+    QUICKTYPE_CMD="npx quicktype"
+  else
+    print_colored red "Error: quicktype is not installed and npx is not available"
     echo "Please install quicktype: npm install -g quicktype"
+    echo "Or ensure npx is available (comes with npm)"
     exit 1
   fi
 }
@@ -117,7 +124,7 @@ generate_model() {
 
   cd "${SCHEMAS_DIR}" || exit 1
 
-  if quicktype -s schema "${CONFIG[schema_file]}" --lang ts -o "${CONFIG[output_file]}"; then
+  if ${QUICKTYPE_CMD} -s schema "${CONFIG[schema_file]}" --lang ts -o "${CONFIG[output_file]}"; then
     print_colored green "✓ Model generated successfully"
   else
     print_colored red "Error: Failed to generate model"
