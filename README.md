@@ -8,7 +8,7 @@
 
 <!-- MARKETPLACE-EXCLUDE-END -->
 
-# Meet Remember MCP – Real Memory for VS Code & Your AI
+# Remember MCP – GitHub Copilot Usage Analytics & Optional MCP Server Integration
 <!-- MARKETPLACE-EXCLUDE-START -->
 
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/nickeolofsson.remember-mcp-vscode?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=nickeolofsson.remember-mcp-vscode)
@@ -16,178 +16,446 @@
 
 <!-- MARKETPLACE-EXCLUDE-END -->
 
-Experience **Remember MCP**, the VS Code extension that brings real, persistent memory to your AI assistant and your team. Instantly store preferences, facts, and best practices—so Copilot always knows your context, and your team’s knowledge is never lost.
+**Remember MCP** is a VS Code extension that **monitors and analyzes your GitHub Copilot usage** by scanning VS Code's internal chat session files and Copilot request logs. Get detailed insights into which AI models you're using, track premium requests, and understand your Copilot interaction patterns—all without requiring any external servers.
 
-Want to explore or run the Mode Manager MCP server directly? [Check out Mode Manager MCP on GitHub](https://github.com/NiclasOlofsson/mode-manager-mcp) for standalone usage, advanced memory management, and more features.
+**Additionally**, this extension can optionally register the [Mode Manager MCP server](https://github.com/NiclasOlofsson/mode-manager-mcp) with VS Code's built-in MCP system, enabling advanced memory management and chat modes for Copilot.
 
-**Track your Copilot model usage and premium requests!** This extension was built not only to simplify installation of Mode Manager MCP, but also to help you monitor and control your GitHub Copilot usage—so you can keep an eye on premium requests and manage costs.
+## 🎯 What This Extension Actually Does
 
-## Why “Remember MCP”? (Features & Benefits)
+### Primary Feature: Copilot Usage Analytics (No External Dependencies)
+The extension's **main purpose** is to provide comprehensive analytics about your GitHub Copilot usage by:
+- **Scanning** VS Code's internal Copilot chat session JSON files (stored in `~/.vscode/User/globalStorage/`)
+- **Monitoring** Copilot request logs across all VS Code instances on your machine
+- **Analyzing** model usage patterns, response times, and file edit statistics
+- **Visualizing** your Copilot activity through interactive dashboards in the sidebar
 
-- **Copilot Model Usage Monitoring**: Track premium requests and keep tabs on your GitHub Copilot usage—manage costs and avoid surprises.
-- **Personal AI Memory**: Your preferences, habits, and reminders are always available to Copilot.
-- **Workspace (Team) Memory**: Share onboarding notes, coding conventions, and project wisdom—right in your repo.
-- **Language-Specific Memory**: Save and retrieve tips for Python, C#, and more. Your assistant adapts automatically.
-- **Native MCP Integration**: Seamless registration with VS Code’s Model Context Protocol (MCP) system.
-- **Visual Management**: Effortless control via activity bar and status bar.
-- **Smarter Coding, Fewer Repeated Questions**: Your memory grows over time, making your AI and team smarter.
-## Copilot Model Usage Monitoring
+**This core functionality works completely standalone—no Python, no external servers, no additional setup required.**
 
-One of the most valuable features of Remember MCP is its ability to monitor your GitHub Copilot model usage. See how many premium requests you make, track your usage patterns, and stay aware of costs—so you can make informed decisions and avoid unexpected charges.
+### Secondary Feature: Optional MCP Server Registration
+As an **optional feature**, you can enable MCP server registration to:
+- Add persistent memory capabilities to Copilot (personal, workspace, language-specific)
+- Use custom chat modes and power prompts
+- Enhance Copilot with additional context management tools
 
-## Real-World Examples: Just Say It!
+This secondary feature requires Python and the mode-manager-mcp server, which the extension can help you set up.
 
-You don’t need special syntax—just talk to Copilot naturally. Remember MCP is extremely relaxed about how you phrase things. If it sounds like something you want remembered, it will be!
+## 📊 Architecture & Data Flow
 
-> You: I like detailed docstrings and use pytest for testing. (Copilot, keep that in mind.)
-> Team: We always use the Oatly data pipeline template and follow our naming conventions. (Let’s make sure everyone remembers that.)
-> Language: For Python, use type hints and Black formatting. In C#, always use nullable reference types.
+### High-Level Architecture
 
-## Get It Running (2 Minutes)
-
-Getting started is usually automatic! Remember MCP makes a good effort to detect if Python and pipx are installed, and will even install pipx for you if Python is present. Most users won’t need to do anything—just install the extension and let it handle setup.  
-
-If everything else fails, here’s how you get it running manually:
-
-### 1. Install Python
-Get it at [python.org/downloads](https://www.python.org/downloads/)
-
-### 2. Install pipx
-```bash
-pip install pipx
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Remember MCP Extension                        │
+│                                                                   │
+│  ┌────────────────────┐          ┌──────────────────────────┐   │
+│  │  Usage Analytics   │          │  MCP Server Manager      │   │
+│  │  (Primary Feature) │          │  (Optional Feature)      │   │
+│  └────────────────────┘          └──────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+           │                                    │
+           │                                    │
+           ▼                                    ▼
+┌──────────────────────┐          ┌──────────────────────────────┐
+│  VS Code Internal    │          │  VS Code MCP API             │
+│  Storage & Logs      │          │  (mcpServerDefinitionProvider)│
+│                      │          │                              │
+│  • Chat Sessions     │          │  Registers:                  │
+│  • Request Logs      │          │  mode-manager-mcp server     │
+│  • File Edits        │          │  (external process)          │
+└──────────────────────┘          └──────────────────────────────┘
 ```
 
-### 3. Install this extension from the VS Code marketplace
+### Data Flow Diagram (Primary Feature: Usage Analytics)
 
-[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/nickeolofsson.remember-mcp-vscode?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=nickeolofsson.remember-mcp-vscode)
+```mermaid
+graph TB
+    subgraph "INPUT: VS Code Internal Data"
+        A1[Chat Session Files<br/>~/.vscode/User/globalStorage/<br/>.../chatSessions/*.json]
+        A2[Copilot Request Logs<br/>Various VS Code log files]
+    end
+    
+    subgraph "PROCESSING: Extension Components"
+        B1[ChatSessionScanner<br/>Scans session JSON files]
+        B2[GlobalLogScanner<br/>Parses request logs]
+        B3[UnifiedSessionDataService<br/>Combines & normalizes data]
+        B4[AnalyticsService<br/>Computes metrics & KPIs]
+    end
+    
+    subgraph "OUTPUT: User Interface"
+        C1[Copilot Usage History Panel<br/>Detailed analytics & charts]
+        C2[Activity Feed<br/>Recent interactions]
+        C3[Model Statistics<br/>Usage by model]
+        C4[Agent Statistics<br/>Usage by agent type]
+        C5[Export Data<br/>JSON/CSV export]
+    end
+    
+    A1 -->|Read JSON| B1
+    A2 -->|Parse logs| B2
+    B1 -->|Session events| B3
+    B2 -->|Log entries| B3
+    B3 -->|Unified data| B4
+    B4 -->|KPIs & Analytics| C1
+    B4 -->|Activity stream| C2
+    B4 -->|Model metrics| C3
+    B4 -->|Agent metrics| C4
+    B3 -->|Raw data| C5
+    
+    style A1 fill:#e1f5ff
+    style A2 fill:#e1f5ff
+    style B3 fill:#fff3e0
+    style B4 fill:#fff3e0
+    style C1 fill:#e8f5e9
+```
 
-## How It Works (Under the Hood)
+### ASCII Data Flow (Alternative View)
 
-Remember MCP uses VS Code’s official MCP API to:
-- Register your mode-manager-mcp server with VS Code
-- VS Code automatically manages the server lifecycle (starts/stops as needed)
-- Copilot automatically discovers and uses your memory and chat modes
-- No manual process management—VS Code handles everything!
+```
+INPUT                    PROCESSING                    OUTPUT
+═══════                  ══════════                    ══════
 
-### Memory Scopes
-- **Personal Memory**: Stored in your user prompts directory—private to you.
-- **Workspace Memory**: Shared in the repo for your team.
-- **Language Memory**: Automatically loaded for each language.
+Chat Session    ──┐
+JSON Files        │
+                  ├──► ChatSessionScanner ──┐
+Request Log   ────┤                          │
+Files             │                          ├──► UnifiedSessionData ──► AnalyticsService ──┬──► Usage History Panel
+                  └──► GlobalLogScanner ─────┘         Service                              │
+                                                                                             ├──► Activity Feed
+                                                                                             │
+File System                                                                                  ├──► Model Statistics
+Watchers ────────────────────────────────────────────────────────────────────────────────►  │
+(Real-time                                                                                   └──► Export Data (JSON/CSV)
+ updates)
+```
 
-### How Memory is Stored & Loaded
-All memory is saved as Markdown files with YAML frontmatter—human- and machine-readable. Mode Manager MCP creates and updates these files as you add new memories. VS Code Copilot Chat loads them every turn, so your context is always active.
+## 🔍 Understanding MCP (Model Context Protocol) Integration
+
+### What is MCP?
+The **Model Context Protocol (MCP)** is a standardized way for AI tools to access external context, tools, and resources. VS Code 1.102+ includes built-in MCP support, allowing extensions to register MCP servers that provide additional capabilities to Copilot.
+
+### How This Extension Uses MCP (Optional Feature Only)
+
+**Important:** The MCP server registration is an **optional secondary feature**. The extension's primary analytics functionality does NOT use MCP and works independently.
+
+```mermaid
+graph LR
+    subgraph "Remember MCP Extension"
+        A[MCP Server Manager]
+    end
+    
+    subgraph "VS Code MCP System"
+        B[VS Code MCP API<br/>registerMcpServerDefinitionProvider]
+        C[Copilot Chat]
+    end
+    
+    subgraph "External Process"
+        D[mode-manager-mcp<br/>Python Server]
+        E[Memory Tools]
+        F[Chat Modes]
+    end
+    
+    A -->|"Registers via API<br/>(when enabled)"| B
+    B -->|Spawns & manages| D
+    D -->|Provides tools| E
+    D -->|Provides modes| F
+    E -->|Available to| C
+    F -->|Available to| C
+    
+    style A fill:#fff3e0
+    style D fill:#e1f5ff
+    style E fill:#e8f5e9
+    style F fill:#e8f5e9
+```
+
+### Does This Extension Require an External MCP Server?
+
+**No, not for the primary feature!** Here's the breakdown:
+
+| Feature | Requires External MCP Server? | Dependencies |
+|---------|------------------------------|-------------|
+| **Copilot Usage Analytics** | ❌ No | None - uses VS Code's internal data |
+| **Dashboard & Statistics** | ❌ No | None - all processing done in-extension |
+| **Real-time Monitoring** | ❌ No | None - watches VS Code's file system |
+| **Data Export** | ❌ No | None - pure TypeScript processing |
+| **MCP Server Registration** | ✅ Yes (optional) | Python + mode-manager-mcp server |
+
+### Communication with External MCP Server (When Enabled)
+
+When you enable the optional MCP server feature:
+
+1. **Registration Phase:**
+   ```typescript
+   // Extension registers server definition with VS Code
+   vscode.lm.registerMcpServerDefinitionProvider('remember-mcp-provider', {
+     provideMcpServerDefinitions: async () => {
+       return [new vscode.McpStdioServerDefinition(
+         'Remember MCP (Mode Manager)',
+         command,  // e.g., 'pipx run mode-manager-mcp'
+         args,
+         {}, // environment variables
+         '1.0.0'
+       )];
+     }
+   });
+   ```
+
+2. **Lifecycle Management:**
+   - VS Code automatically spawns the external MCP server process
+   - VS Code manages stdin/stdout communication with the server
+   - VS Code stops the server when no longer needed
+
+3. **Communication Protocol:**
+   - **Protocol:** JSON-RPC over stdio (standard input/output)
+   - **Direction:** Bidirectional between VS Code and MCP server
+   - **Extension's Role:** Only registers the server; does NOT communicate directly
+   - **Copilot's Role:** Calls MCP tools/resources as needed during chat
+
+## 🚀 Features & Benefits
+
+### Primary Features (Always Available)
+- **📈 Comprehensive Usage Analytics**: Track which models you use, how often, and when
+- **💰 Cost Monitoring**: Understand your premium model usage to manage Copilot costs
+- **⚡ Performance Metrics**: See response times, latency percentiles, and model performance
+- **📝 Activity History**: Browse your complete Copilot interaction history
+- **🎯 Agent Statistics**: Understand which Copilot agents you use most
+- **📊 Model Breakdown**: See GPT-4, GPT-3.5, and other model usage patterns
+- **💾 Data Export**: Export your usage data to JSON or CSV for external analysis
+- **🔄 Real-time Updates**: Dashboard updates automatically as you use Copilot
+
+### Secondary Features (Optional - When MCP Server Enabled)
+- **🧠 Personal AI Memory**: Your preferences and reminders persist across sessions
+- **👥 Workspace Memory**: Share team knowledge and conventions in your repository
+- **🗣️ Language-Specific Memory**: Automatic context for Python, JavaScript, etc.
+- **🎭 Custom Chat Modes**: Switch between different prompting modes for various tasks
+- **📚 Power Prompts**: Pre-configured instruction sets for complex workflows
+
+## 📦 Installation & Setup
+
+### Quick Start (Analytics Only - Recommended)
+
+1. **Install from VS Code Marketplace**
+   
+   [![Install](https://img.shields.io/visual-studio-marketplace/v/nickeolofsson.remember-mcp-vscode?label=Install%20Now)](https://marketplace.visualstudio.com/items?itemName=nickeolofsson.remember-mcp-vscode)
+
+2. **That's it!** The extension will immediately start monitoring your Copilot usage.
+
+3. **View Analytics:**
+   - Click the Remember MCP icon in the Activity Bar (left sidebar)
+   - Explore the "Copilot Usage History" panel
+
+### Optional: Enable MCP Server Features
+
+If you want the memory and chat mode features, follow these additional steps:
+
+1. **Install Python 3.10+**
+   ```bash
+   # Check if you have Python
+   python --version  # or python3 --version
+   ```
+
+2. **Install pipx** (if using default command)
+   ```bash
+   pip install pipx
+   # or
+   python -m pip install pipx
+   ```
+
+3. **Configure & Enable MCP Server**
+   - Open VS Code Settings (`Ctrl/Cmd + ,`)
+   - Search for "Remember MCP"
+   - Ensure `remember-mcp.server.autoStart` is enabled
+   - The extension will attempt to register the MCP server on startup
+
+4. **Alternative: Custom Server Command**
+   
+   You can customize how the MCP server is launched:
+   ```json
+   {
+     "remember-mcp.server.command": "uvx mode-manager-mcp",
+     // or
+     "remember-mcp.server.command": "docker run ... mode-manager-mcp",
+     // or if installed globally
+     "remember-mcp.server.command": "mode-manager-mcp"
+   }
+   ```
+
+## 📖 Usage
+
+### Viewing Usage Analytics
+
+1. **Open the Remember MCP Sidebar**
+   - Click the Remember MCP icon in the Activity Bar
+
+2. **Explore the Panels:**
+   - **Copilot Usage History**: Detailed analytics with KPIs, charts, and trends
+   - **Copilot Usage**: Quick overview of current session statistics
+   - **Server Control**: Manage the optional MCP server (if enabled)
+
+3. **Key Metrics Explained:**
+   - **Turns**: Number of back-and-forth exchanges with Copilot
+   - **Sessions**: Distinct chat sessions you've had
+   - **Requests**: Individual API requests to AI models
+   - **Edits**: Times Copilot suggested file changes
+   - **Edit Ratio**: Percentage of turns that resulted in file edits
+   - **Latency**: Response time metrics (median, P95)
+
+### Exporting Your Data
+
+Click the **Export** button in the Usage History panel to save your data as:
+- **JSON**: Complete raw data for programmatic analysis
+- **CSV**: Spreadsheet-compatible format for Excel/Google Sheets
+
+### Working with the MCP Server (Optional)
+
+Once the MCP server is registered:
+
+1. **Ask Copilot to Remember Something:**
+   ```
+   You: "Remember that I prefer detailed docstrings and use pytest for testing."
+   Copilot: ✓ Stored in your personal memory
+   ```
+
+2. **Share Team Knowledge:**
+   ```
+   You: "Team: We use the Acme data pipeline template for all ETL jobs."
+   Copilot: ✓ Stored in workspace memory
+   ```
+
+3. **Language-Specific Tips:**
+   ```
+   You: "For Python, always use type hints and Black formatting."
+   Copilot: ✓ Stored in Python language memory
+   ```
+
+4. **Switch Chat Modes:**
+   - Use `.chatmode.md` files to define custom prompting modes
+   - Tell Copilot: "Switch to beast mode" or "Use architect mode"
 
 <!-- MARKETPLACE-EXCLUDE-START -->
 
-## Usage
+## ⚙️ Configuration
 
-### Quick Start
-1. Install the extension and requirements
-2. The MCP server will auto-register if enabled in settings
-3. Use the "Remember MCP" activity bar to control registration
-4. Access commands via the Command Palette (`Ctrl+Shift+P`):
-   - `Remember MCP: Register MCP Server`
-   - `Remember MCP: Unregister MCP Server`
-   - `Remember MCP: Re-register MCP Server`
-   - `Remember MCP: Show MCP Panel`
+All settings are available in VS Code Settings (`Ctrl/Cmd + ,`) under "Remember MCP":
 
-### Activity Bar Panel
-Shows server status, quick actions, and interactive webview for server management.
+### Core Settings
 
-### Status Bar
-Displays current MCP server registration status:
-- `$(server) MCP Running` - Server is registered
-- `$(server) MCP Stopped` - Server is not registered
-- `$(error) MCP Error` - Registration error
-Click to open the MCP control panel.
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `remember-mcp.logLevel` | `info` | Log verbosity: `trace`, `debug`, `info`, `warn`, `error` |
+| `remember-mcp.sessionAnalysis.enabled` | `false` | Enable background analysis of Copilot sessions |
 
-## Power Prompts & Custom Modes
+### MCP Server Settings (Optional Feature)
 
-Context prompting is critical for getting the best results from Copilot. Remember MCP helps you manage instructions and chatmodes—switch between “Beast Mode” for deep research, “Architect Mode” for big-picture thinking, and more. Easily create, edit, and organize your own `.chatmode.md` and `.instructions.md` files.
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `remember-mcp.server.autoStart` | `true` | Auto-register MCP server on VS Code startup |
+| `remember-mcp.server.command` | `pipx run ...` | Command to launch the MCP server |
 
-## Configuration
+## 🔧 Troubleshooting
 
-Configure the extension through VS Code settings (`Ctrl+,`):
+### Analytics Not Showing Data?
+
+1. **Use Copilot First**: The extension monitors your Copilot usage, so you need to use Copilot Chat to generate data
+2. **Check Data Location**: Ensure VS Code's user data directory is accessible
+3. **View Logs**: Open Output panel (`Ctrl/Cmd + Shift + U`) and select "Remember MCP"
+
+### MCP Server Won't Register?
+
+The MCP server feature is optional. If you only want analytics, you can disable it:
 ```json
 {
-  "remember-mcp.server.autoStart": true,
-  "remember-mcp.server.command": "pipx run --system-site-packages --spec git+https://github.com/NiclasOlofsson/mode-manager-mcp.git mode-manager-mcp"
+  "remember-mcp.server.autoStart": false
 }
 ```
-For custom installations, update the server command as needed.
 
-<!-- MARKETPLACE-EXCLUDE-END -->
+If you want to enable MCP server features:
 
-## Troubleshooting
+1. **Check Prerequisites:**
+   ```bash
+   python --version  # Should be 3.10+
+   pipx --version    # Should be installed
+   ```
 
-### Server Won't Register?
-1. Ensure Python 3.10+ is installed: `python --version`
-2. Check if pipx is available: `pipx --version`
-3. Verify mode-manager-mcp is available: `pipx run mode-manager-mcp --help`
-4. Check the Output panel for error messages
-5. Ensure VS Code 1.102.0+ (MCP API support required)
+2. **Test Server Manually:**
+   ```bash
+   pipx run --spec git+https://github.com/NiclasOlofsson/mode-manager-mcp.git mode-manager-mcp --help
+   ```
 
-<!-- MARKETPLACE-EXCLUDE-START -->
-## Development
+3. **Check VS Code MCP Settings:**
+   - Ensure `chat.mcp.enabled` is not set to `false` in VS Code settings
+
+4. **Review Logs:**
+   - Open "Remember MCP" output channel for detailed error messages
+
+### Data Export Fails?
+
+- Ensure you have write permissions to the selected directory
+- Try exporting to a different location
+- Check available disk space
+
+## 🏗️ Development
 
 ### Building from Source
+
 ```bash
-git clone https://github.com/NiclasOlofsson/remember-mcp-vscode
+git clone https://github.com/tobiashochguertel/remember-mcp-vscode
 cd remember-mcp-vscode
 npm install
 npm run compile
 ```
 
 ### Running in Development
+
 1. Open the project in VS Code
-2. Press `F5` to launch a new Extension Development Host
+2. Press `F5` to launch Extension Development Host
 3. Test the extension in the new window
-
-### CI/CD Workflow
-
-This repository includes a GitHub Actions workflow that automatically:
-- ✅ Builds and type-checks the extension
-- ✅ Runs linting checks
-- ✅ Packages the extension as VSIX
-- ✅ Performs security audits
-- ✅ Tests on Linux (default) and macOS (manual trigger)
-
-**Automatic Triggers:**
-- Push to `main` or `develop` branches
-- Pull requests to `main` or `develop`
-
-**Manual Trigger with OS Selection:**
-1. Go to the [Actions tab](../../actions)
-2. Select "CI" workflow
-3. Click "Run workflow"
-4. Choose OS: `ubuntu-latest` (default) or `macos-latest`
-5. Click "Run workflow" button
-
-The workflow artifacts (VSIX files) are available for download from the Actions tab for 7 days.
 
 ### Quality Checks
 
-Before committing, ensure:
 ```bash
 npm run lint        # Check code style
 npm run typecheck   # Verify TypeScript types
+npm run test        # Run test suite
 npm run compile     # Build the extension
 ```
 
-See [EXTENSION_ANALYSIS.md](EXTENSION_ANALYSIS.md) for detailed analysis and recommendations.
+### Project Structure
 
-## Related Projects & Links
-- [mode-manager-mcp](https://github.com/NiclasOlofsson/mode-manager-mcp) – The MCP server this extension registers
-- [Model Context Protocol](https://modelcontextprotocol.io/) – Learn more about MCP
-- [VS Code MCP Documentation](https://code.visualstudio.com/api/references/vscode-api#lm) – VS Code MCP API reference
+```
+remember-mcp-vscode/
+├── src/
+│   ├── extension.ts              # Main entry point
+│   ├── scanning/                 # Data collection modules
+│   │   ├── chat-session-scanner.ts    # Scans session JSON files
+│   │   ├── global-log-scanner.ts      # Parses Copilot logs
+│   │   └── ...
+│   ├── services/                 # Business logic
+│   │   ├── analytics-service.ts       # Computes metrics & KPIs
+│   │   ├── unified-session-data-service.ts  # Data aggregation
+│   │   └── ...
+│   ├── webview/                  # UI components
+│   │   ├── copilot-usage-history-panel/  # Main analytics dashboard
+│   │   ├── copilot-usage-panel/          # Quick stats view
+│   │   └── server-control-panel/         # MCP server controls
+│   └── types/                    # TypeScript type definitions
+└── ...
+```
 
+## 📚 Related Projects
 
-## Contributing
+- **[mode-manager-mcp](https://github.com/NiclasOlofsson/mode-manager-mcp)** – The external MCP server this extension can optionally register
+- **[Model Context Protocol](https://modelcontextprotocol.io/)** – Learn about the MCP standard
+- **[VS Code MCP API](https://code.visualstudio.com/api/references/vscode-api#lm)** – VS Code's MCP integration documentation
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request. See [EXTENSION_ANALYSIS.md](EXTENSION_ANALYSIS.md) for detailed technical analysis.
 
 <!-- MARKETPLACE-EXCLUDE-END -->
 
-## License
+## 📄 License
 
 MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+This extension builds on VS Code's built-in MCP support and integrates with the mode-manager-mcp server for optional memory features. The analytics functionality is entirely self-contained and works independently.
